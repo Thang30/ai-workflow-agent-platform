@@ -1,0 +1,7 @@
+# for fastapi
+fastapi==0.135.3
+uvicorn==0.44.0
+
+# for langchain
+langchain==1.2.15
+openai==2.31.0

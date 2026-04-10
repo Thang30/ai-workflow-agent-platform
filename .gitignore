@@ -33,11 +33,7 @@ yarn-error.log*
 
 # --- General / OS ---
 # Environment variables (Sensitive Info!)
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env*
 
 # IDEs and Editors
 .vscode/

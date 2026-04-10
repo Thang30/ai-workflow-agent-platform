@@ -4,4 +4,9 @@ uvicorn==0.44.0
 
 # for langchain
 langchain==1.2.15
-openai==2.31.0
+
+# for LLMs
+huggingface_hub==1.10.1
+
+# for environment variables
+python-dotenv==1.2.2

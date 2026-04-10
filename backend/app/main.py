@@ -15,4 +15,5 @@ def root():
 def chat(input: dict):
     query = input.get("query", "")
     response = agent.run(query)
+    print("LLM response:", response)
     return {"response": response}

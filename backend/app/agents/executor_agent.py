@@ -1,29 +1,39 @@
-# Executor Agent
-# Responsible for:
-# - Taking input from the user
-# - Using tools when needed
-# - Returning a response
-
+from app.core.llm import LLMClient
 from app.tools.web_search import web_search
-
 
 class ExecutorAgent:
     def __init__(self):
-        pass
+        self.llm = LLMClient()
 
     def run(self, query: str) -> str:
         """
-        Executes a user query using available tools.
-
-        Steps:
-        1. Decide if tool is needed
-        2. Call tool
-        3. Return formatted response
+        Uses LLM to decide how to respond
         """
-        # TODO: replace with LLM-based decision later
 
-        if "search" in query.lower() or "find" in query.lower():
-            result = web_search(query)
-            return f"Used web search tool:\n{result}"
+        prompt = f"""
+You are an AI assistant.
 
-        return f"Direct response: {query}"
+If the user asks to search or find information,
+you should say: USE_TOOL
+
+Otherwise respond normally.
+
+User query: {query}
+"""
+
+        decision = self.llm.chat(prompt)
+
+        if "USE_TOOL" in decision:
+            tool_result = web_search(query)
+
+            final_prompt = f"""
+User query: {query}
+
+Tool result:
+{tool_result}
+
+Generate final answer.
+"""
+            return self.llm.chat(final_prompt)
+
+        return decision

@@ -4,9 +4,11 @@ type StreamHandlers = {
   onMessage: (message: WorkflowMessage) => void;
 };
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export const streamWorkflow = (query: string, handlers: StreamHandlers) => {
   const eventSource = new EventSource(
-    `http://localhost:8000/workflow/stream?query=${encodeURIComponent(query)}`,
+    `${API_URL}/workflow/stream?query=${encodeURIComponent(query)}`,
   );
 
   const events: WorkflowEventName[] = [

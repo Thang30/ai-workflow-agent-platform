@@ -10,3 +10,6 @@ huggingface_hub==1.10.1
 
 # for environment variables
 pydantic_settings==2.13.1
+
+# for streaming responses
+sse-starlette==3.4.1

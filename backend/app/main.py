@@ -24,4 +24,5 @@ def chat(input: dict):
 def plan(input: dict):
     query = input.get("query", "")
     steps = planner.run(query)
+    print("Generated plan:", steps)
     return {"plan": steps}

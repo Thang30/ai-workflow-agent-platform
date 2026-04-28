@@ -55,3 +55,6 @@ Thumbs.db
 
 # Custom logs and traces
 *trace_*.json
+
+# temp quick test file
+quick_test.py

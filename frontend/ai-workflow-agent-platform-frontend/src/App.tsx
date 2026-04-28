@@ -17,12 +17,16 @@ function App() {
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>AI Workflow Agent</h1>
+    <div className="container">
+      <h1 style={{ marginBottom: '20px' }}>🤖 AI Workflow Agent</h1>
 
       <ChatInput onSubmit={handleSubmit} />
 
-      {loading && <p>Running workflow...</p>}
+      {loading && (
+        <div className="card">
+          <p>⏳ Running workflow...</p>
+        </div>
+      )}
 
       {data && (
         <>

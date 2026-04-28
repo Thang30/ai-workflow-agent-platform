@@ -1,29 +1,32 @@
 export default function TraceView({ traces }: any) {
   return (
-    <div>
-      <h2>Execution</h2>
+    <div className="card">
+      <h2>⚙️ Execution</h2>
+
       {traces.map((t: any) => (
         <div
           key={t.step}
           style={{
-            border: '1px solid #ccc',
-            margin: '10px',
-            padding: '10px',
+            borderTop: '1px solid #334155',
+            paddingTop: '10px',
+            marginTop: '10px',
           }}
         >
           <h3>Step {t.step}</h3>
-          <p>
-            <strong>{t.description}</strong>
-          </p>
+          <p style={{ opacity: 0.8 }}>{t.description}</p>
 
           <details>
-            <summary>Input</summary>
-            <pre>{t.input}</pre>
-          </details>
+            <summary style={{ cursor: 'pointer', marginTop: '5px' }}>
+              Show details
+            </summary>
 
-          <details>
-            <summary>Output</summary>
-            <pre>{t.output}</pre>
+            <div style={{ marginTop: '10px' }}>
+              <strong>Input:</strong>
+              <pre>{t.input}</pre>
+
+              <strong>Output:</strong>
+              <pre>{t.output}</pre>
+            </div>
           </details>
         </div>
       ))}

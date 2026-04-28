@@ -37,6 +37,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+.vite
 
 # --- General / OS ---
 # Environment variables (Sensitive Info!)

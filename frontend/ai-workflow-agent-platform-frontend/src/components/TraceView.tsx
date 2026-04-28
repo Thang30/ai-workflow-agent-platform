@@ -1,33 +1,42 @@
-export default function TraceView({ traces }: any) {
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+type WorkflowStep = {
+  step: number;
+  description: string;
+  status: 'running' | 'done';
+  output: string;
+};
+
+type TraceViewProps = {
+  steps: WorkflowStep[];
+};
+
+export default function TraceView({ steps }: TraceViewProps) {
   return (
     <div className="card">
       <h2>⚙️ Execution</h2>
 
-      {traces.map((t: any) => (
+      {steps.map((s) => (
         <div
-          key={t.step}
-          style={{
-            borderTop: '1px solid #334155',
-            paddingTop: '10px',
-            marginTop: '10px',
-          }}
+          key={s.step}
+          className={`execution-step execution-step--${s.status}`}
         >
-          <h3>Step {t.step}</h3>
-          <p style={{ opacity: 0.8 }}>{t.description}</p>
+          <strong className="execution-step__title">
+            Step {s.step}: {s.description}
+          </strong>
 
-          <details>
-            <summary style={{ cursor: 'pointer', marginTop: '5px' }}>
-              Show details
-            </summary>
+          <p className="execution-step__status">
+            {s.status === 'running' ? '⏳ Running...' : '✅ Done'}
+          </p>
 
-            <div style={{ marginTop: '10px' }}>
-              <strong>Input:</strong>
-              <pre>{t.input}</pre>
-
-              <strong>Output:</strong>
-              <pre>{t.output}</pre>
+          {s.output && (
+            <div className="execution-step__output markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {s.output}
+              </ReactMarkdown>
             </div>
-          </details>
+          )}
         </div>
       ))}
     </div>

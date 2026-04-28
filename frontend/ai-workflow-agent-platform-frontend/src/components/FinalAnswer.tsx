@@ -1,8 +1,17 @@
-export default function FinalAnswer({ answer }: any) {
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+type FinalAnswerProps = {
+  answer: string;
+};
+
+export default function FinalAnswer({ answer }: FinalAnswerProps) {
   return (
     <div className="card">
       <h2>✅ Final Answer</h2>
-      <p style={{ lineHeight: '1.6' }}>{answer}</p>
+      <div className="markdown-body">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+      </div>
     </div>
   );
 }

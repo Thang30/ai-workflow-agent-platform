@@ -5,6 +5,8 @@ from app.agents.executor_agent import ExecutorAgent
 from app.agents.planner_agent import PlannerAgent
 from app.core.orchestrator import WorkflowOrchestrator
 
+from sse_starlette.sse import EventSourceResponse
+
 app = FastAPI()
 
 allowed_origins = [
@@ -51,3 +53,8 @@ def workflow(input: dict):
     result = orchestrator.run(query)
     print("Workflow result:", result)
     return result
+
+
+@app.get("/workflow/stream")
+async def workflow_stream(query: str):
+    return EventSourceResponse(orchestrator.stream_events(query))

@@ -6,7 +6,6 @@ from app.agents.planner_agent import PlannerAgent
 from app.core.orchestrator import WorkflowOrchestrator
 
 from sse_starlette.sse import EventSourceResponse
-import asyncio
 
 app = FastAPI()
 
@@ -56,51 +55,6 @@ def workflow(input: dict):
     return result
 
 
-def build_workflow_stream(query: str):
-    async def event_generator():
-        yield {"event": "status", "data": "🧠 Planning..."}
-
-        plan = orchestrator.planner.run(query)
-        yield {"event": "plan", "data": plan}
-
-        context = ""
-
-        for step in plan:
-            step_desc = step["description"]
-
-            yield {
-                "event": "step_start",
-                "data": {"step": step["step"], "description": step_desc},
-            }
-
-            enriched_input = f"""
-Context:
-{context}
-
-Step:
-{step_desc}
-"""
-
-            result = orchestrator.executor.run(enriched_input)
-
-            context += f"\nStep {step['step']}: {result}\n"
-
-            yield {
-                "event": "step_done",
-                "data": {"step": step["step"], "output": result},
-            }
-
-            await asyncio.sleep(0.1)  # small delay for UX
-
-        yield {"event": "status", "data": "🧠 Reviewing..."}
-
-        final = orchestrator.reviewer.run(query, plan, [])
-
-        yield {"event": "final", "data": final}
-
-    return EventSourceResponse(event_generator())
-
-
 @app.get("/workflow/stream")
 async def workflow_stream(query: str):
-    return build_workflow_stream(query)
+    return EventSourceResponse(orchestrator.stream_events(query))

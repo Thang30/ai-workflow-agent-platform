@@ -3,20 +3,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.agents.executor_agent import ExecutorAgent
 from app.agents.planner_agent import PlannerAgent
+from app.core.config import settings
 from app.core.orchestrator import WorkflowOrchestrator
 
 from sse_starlette.sse import EventSourceResponse
 
 app = FastAPI()
 
-allowed_origins = [
-    # "http://localhost:5173",
-    "https://ai-workflow-agent-platform-frontend.vercel.app"
-]
+allowed_origins = [origin.rstrip("/") for origin in settings.frontend_origins]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=settings.frontend_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

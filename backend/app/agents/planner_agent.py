@@ -1,4 +1,5 @@
 import json
+import re
 from app.core.llm import LLMClient
 
 
@@ -9,6 +10,9 @@ class PlannerAgent:
     def _clean_json(self, text: str) -> str:
         return text.strip().replace("```json", "").replace("```", "")
 
+    def _normalize_json(self, text: str) -> str:
+        return re.sub(r",(\s*[\]}])", r"\1", text)
+
     def _extract_steps(self, text: str):
         cleaned_text = self._clean_json(text)
         decoder = json.JSONDecoder()
@@ -17,10 +21,15 @@ class PlannerAgent:
             if char not in "[{":
                 continue
 
+            candidate = cleaned_text[index:]
+
             try:
-                parsed, _ = decoder.raw_decode(cleaned_text[index:])
+                parsed, _ = decoder.raw_decode(candidate)
             except json.JSONDecodeError:
-                continue
+                try:
+                    parsed, _ = decoder.raw_decode(self._normalize_json(candidate))
+                except json.JSONDecodeError:
+                    continue
 
             if isinstance(parsed, list):
                 return parsed
@@ -33,7 +42,8 @@ class PlannerAgent:
         Returns a list of steps.
         """
 
-        prompt = """
+        prompt = (
+            """
 You are a planning agent.
 
 Break the user's request into clear steps.
@@ -52,7 +62,10 @@ Example:
 ]
 
 User request:
-""" + query + "\n"
+"""
+            + query
+            + "\n"
+        )
 
         response = self.llm.chat(prompt)
 
@@ -63,4 +76,3 @@ User request:
             print("Error parsing JSON:", e)
             print("LLM response was:", response)
             return [{"step": 1, "description": query}]
-        

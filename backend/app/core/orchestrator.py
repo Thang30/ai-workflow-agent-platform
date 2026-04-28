@@ -20,6 +20,9 @@ class WorkflowOrchestrator:
         self.executor = ExecutorAgent()
         self.reviewer = ReviewerAgent()
 
+    def _stream_event(self, event: str, data):
+        return {"event": event, "data": json.dumps(data, ensure_ascii=False)}
+
     def _execute_step(self, step: dict, context: str):
         step_desc = step["description"]
         enriched_input = f"""
@@ -91,33 +94,33 @@ class WorkflowOrchestrator:
         return {"input": query, "plan": plan, "traces": traces, "final": final_answer}
 
     async def stream_events(self, query: str):
-        yield {"event": "status", "data": "🧠 Planning..."}
+        yield self._stream_event("status", "🧠 Planning...")
 
         plan = self.planner.run(query)
-        yield {"event": "plan", "data": plan}
+        yield self._stream_event("plan", plan)
 
         results = []
         traces = []
         context = ""
 
         for step in plan:
-            yield {
-                "event": "step_start",
-                "data": {"step": step["step"], "description": step["description"]},
-            }
+            yield self._stream_event(
+                "step_start",
+                {"step": step["step"], "description": step["description"]},
+            )
 
             result_entry, trace, context = self._execute_step(step, context)
             traces.append(trace)
             results.append(result_entry)
 
-            yield {
-                "event": "step_done",
-                "data": {"step": step["step"], "output": result_entry["result"]},
-            }
+            yield self._stream_event(
+                "step_done",
+                {"step": step["step"], "output": result_entry["result"]},
+            )
 
             await asyncio.sleep(0.1)
 
-        yield {"event": "status", "data": "🧠 Reviewing..."}
+        yield self._stream_event("status", "🧠 Reviewing...")
 
         final_answer = self._finalize_workflow(query, plan, results, traces)
-        yield {"event": "final", "data": final_answer}
+        yield self._stream_event("final", final_answer)

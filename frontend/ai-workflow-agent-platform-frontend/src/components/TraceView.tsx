@@ -1,33 +1,28 @@
-export default function TraceView({ traces }: any) {
+export default function StepList({ steps }: any) {
   return (
     <div className="card">
       <h2>⚙️ Execution</h2>
 
-      {traces.map((t: any) => (
+      {steps.map((s: any) => (
         <div
-          key={t.step}
+          key={s.step}
           style={{
-            borderTop: '1px solid #334155',
-            paddingTop: '10px',
-            marginTop: '10px',
+            marginBottom: '12px',
+            padding: '12px',
+            borderRadius: '10px',
+            background: s.status === 'running' ? '#1e40af' : '#065f46',
+            transition: 'all 0.3s',
           }}
         >
-          <h3>Step {t.step}</h3>
-          <p style={{ opacity: 0.8 }}>{t.description}</p>
+          <strong>
+            Step {s.step}: {s.description}
+          </strong>
 
-          <details>
-            <summary style={{ cursor: 'pointer', marginTop: '5px' }}>
-              Show details
-            </summary>
+          <p style={{ marginTop: '5px', opacity: 0.8 }}>
+            {s.status === 'running' ? '⏳ Running...' : '✅ Done'}
+          </p>
 
-            <div style={{ marginTop: '10px' }}>
-              <strong>Input:</strong>
-              <pre>{t.input}</pre>
-
-              <strong>Output:</strong>
-              <pre>{t.output}</pre>
-            </div>
-          </details>
+          {s.output && <pre style={{ marginTop: '10px' }}>{s.output}</pre>}
         </div>
       ))}
     </div>

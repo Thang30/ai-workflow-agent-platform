@@ -10,7 +10,8 @@ from sse_starlette.sse import EventSourceResponse
 app = FastAPI()
 
 allowed_origins = [
-    "http://localhost:5173",
+    # "http://localhost:5173",
+    "https://ai-workflow-agent-platform-frontend.vercel.app"
 ]
 
 app.add_middleware(

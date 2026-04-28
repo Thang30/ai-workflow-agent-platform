@@ -1,11 +1,13 @@
 from app.agents.planner_agent import PlannerAgent
 from app.agents.executor_agent import ExecutorAgent
+from app.agents.reviewer_agent import ReviewerAgent
 
 
 class WorkflowOrchestrator:
     def __init__(self):
         self.planner = PlannerAgent()
         self.executor = ExecutorAgent()
+        self.reviewer = ReviewerAgent()
 
     def run(self, query: str):
         """
@@ -38,4 +40,10 @@ class WorkflowOrchestrator:
                 {"step": step["step"], "description": step_desc, "result": result}
             )
 
-        return {"input": query, "plan": plan, "results": results}
+        formatted_results = "\n".join(
+            [f"Step {r['step']}: {r['result']}" for r in results]
+        )
+
+        final_answer = self.reviewer.run(query, plan, formatted_results)
+
+        return {"input": query, "plan": plan, "results": results, "final": final_answer}

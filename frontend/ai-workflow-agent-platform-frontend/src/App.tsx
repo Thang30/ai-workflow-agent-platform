@@ -5,23 +5,7 @@ import ChatInput from './components/ChatInput';
 import PlanView from './components/PlanView';
 import TraceView from './components/TraceView';
 import FinalAnswer from './components/FinalAnswer';
-
-type PlanStep = {
-  step: number;
-  description: string;
-};
-
-type WorkflowStep = PlanStep & {
-  status: 'running' | 'done';
-  output: string;
-};
-
-type WorkflowMessage =
-  | { event: 'status'; data: string }
-  | { event: 'plan'; data: PlanStep[] }
-  | { event: 'step_start'; data: PlanStep }
-  | { event: 'step_done'; data: { step: number; output: string } }
-  | { event: 'final'; data: string };
+import type { PlanStep, WorkflowMessage, WorkflowStep } from './types/workflow';
 
 function App() {
   const [plan, setPlan] = useState<PlanStep[]>([]);
@@ -51,20 +35,62 @@ function App() {
             break;
 
           case 'step_start':
-            setSteps((prev) => [
-              ...prev,
-              { ...msg.data, status: 'running', output: '' },
-            ]);
+            setSteps((prev) => {
+              const existingStep = prev.find(
+                (step) => step.step === msg.data.step,
+              );
+
+              if (existingStep) {
+                return prev.map((step) =>
+                  step.step === msg.data.step
+                    ? {
+                        ...step,
+                        ...msg.data,
+                        status: 'running',
+                        output: '',
+                        tools: [],
+                      }
+                    : step,
+                );
+              }
+
+              return [
+                ...prev,
+                { ...msg.data, status: 'running', output: '', tools: [] },
+              ];
+            });
             break;
 
           case 'step_done':
-            setSteps((prev) =>
-              prev.map((s) =>
-                s.step === msg.data.step
-                  ? { ...s, status: 'done', output: msg.data.output }
-                  : s,
-              ),
-            );
+            setSteps((prev) => {
+              const existingStep = prev.find(
+                (step) => step.step === msg.data.step,
+              );
+
+              if (!existingStep) {
+                return [
+                  ...prev,
+                  {
+                    step: msg.data.step,
+                    description: `Step ${msg.data.step}`,
+                    status: 'done',
+                    output: msg.data.output,
+                    tools: msg.data.tools ?? [],
+                  },
+                ];
+              }
+
+              return prev.map((step) =>
+                step.step === msg.data.step
+                  ? {
+                      ...step,
+                      status: 'done',
+                      output: msg.data.output,
+                      tools: msg.data.tools ?? [],
+                    }
+                  : step,
+              );
+            });
             break;
 
           case 'final':
@@ -97,21 +123,124 @@ function App() {
     };
   }, []);
 
+  const completedSteps = steps.filter((step) => step.status === 'done').length;
+  const isRunning =
+    Boolean(status) &&
+    status !== 'Completed' &&
+    status !== 'Stream disconnected';
+
+  const stages = [
+    {
+      icon: '🧠',
+      label: 'Planner',
+      detail:
+        plan.length > 0
+          ? `${plan.length} steps mapped`
+          : 'Breaks the request into a strategy',
+      tone: status.includes('Planning')
+        ? 'active'
+        : plan.length > 0
+          ? 'done'
+          : 'idle',
+    },
+    {
+      icon: '⚙️',
+      label: 'Executor',
+      detail:
+        steps.length > 0
+          ? `${completedSteps}/${steps.length} steps finished`
+          : 'Runs steps and calls tools',
+      tone: status.includes('Executing')
+        ? 'active'
+        : steps.length > 0 && (Boolean(final) || status.includes('Reviewing'))
+          ? 'done'
+          : steps.length > 0
+            ? 'active'
+            : 'idle',
+    },
+    {
+      icon: '🔍',
+      label: 'Reviewer',
+      detail: final
+        ? 'Final answer synthesized'
+        : 'Shapes the response for delivery',
+      tone: status.includes('Reviewing') ? 'active' : final ? 'done' : 'idle',
+    },
+  ] as const;
+
   return (
-    <div className="container">
-      <h1 style={{ marginBottom: '20px' }}>🤖 AI Workflow Agent</h1>
-
-      <ChatInput onSubmit={handleStream} />
-
-      {status && (
-        <div className="card">
-          <p>{status}</p>
+    <div className="app-shell">
+      <header className="hero">
+        <div className="hero__badge">Portfolio workflow demo</div>
+        <div className="hero__content">
+          <p className="hero__eyebrow">Planner - Executor - Reviewer</p>
+          <h1>AI Workflow Agent Platform</h1>
+          <p className="hero__lede">
+            A process-first interface that shows how the system plans work,
+            executes steps, uses tools, and delivers a reviewed answer in real
+            time.
+          </p>
         </div>
-      )}
+      </header>
 
-      {plan.length > 0 && <PlanView plan={plan} />}
-      {steps.length > 0 && <TraceView steps={steps} />}
-      {final && <FinalAnswer answer={final} />}
+      <ChatInput onSubmit={handleStream} isRunning={isRunning} />
+
+      <main className="workspace-grid">
+        <section className="workspace-panel">
+          <div className="panel-banner">
+            <div>
+              <p className="panel-banner__eyebrow">Process</p>
+              <h2>Live workflow trace</h2>
+            </div>
+
+            <p className="panel-banner__copy">
+              Follow the plan, execution, and tool usage as the workflow moves
+              from intent to answer.
+            </p>
+          </div>
+
+          <div className="status-board">
+            {stages.map((stage) => (
+              <article
+                key={stage.label}
+                className={`stage-card stage-card--${stage.tone}`}
+              >
+                <p className="stage-card__label">
+                  <span>{stage.icon}</span>
+                  {stage.label}
+                </p>
+                <p className="stage-card__detail">{stage.detail}</p>
+              </article>
+            ))}
+          </div>
+
+          <div className="live-status">
+            <span
+              className={`live-status__dot${isRunning ? ' live-status__dot--active' : ''}`}
+            />
+            <span>{status || 'Waiting for a workflow request.'}</span>
+          </div>
+
+          <PlanView plan={plan} steps={steps} />
+          <TraceView steps={steps} />
+        </section>
+
+        <section className="workspace-panel workspace-panel--answer">
+          <div className="panel-banner panel-banner--answer">
+            <div>
+              <p className="panel-banner__eyebrow">Result</p>
+              <h2>Presentation-ready answer</h2>
+            </div>
+
+            <p className="panel-banner__copy">
+              The reviewer consolidates every step into a clean, polished final
+              response.
+            </p>
+          </div>
+
+          <FinalAnswer answer={final} status={status} />
+        </section>
+      </main>
     </div>
   );
 }

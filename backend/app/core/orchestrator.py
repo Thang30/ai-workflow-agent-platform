@@ -1,6 +1,16 @@
+import json
+from datetime import datetime
+
 from app.agents.planner_agent import PlannerAgent
 from app.agents.executor_agent import ExecutorAgent
 from app.agents.reviewer_agent import ReviewerAgent
+from app.models.trace import StepTrace
+
+
+def save_trace(data):
+    filename = f"trace_{datetime.now().timestamp()}.json"
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=2)
 
 
 class WorkflowOrchestrator:
@@ -21,6 +31,7 @@ class WorkflowOrchestrator:
 
         results = []
         context = ""
+        traces = []
 
         for step in plan:
             step_desc = step["description"]
@@ -34,6 +45,15 @@ class WorkflowOrchestrator:
 
             result = self.executor.run(enriched_input)
 
+            traces.append(
+                StepTrace(
+                    step=step["step"],
+                    description=step_desc,
+                    input=enriched_input,
+                    output=result,
+                ).to_dict()
+            )
+
             context += f"\nStep {step['step']}: {result}\n"
 
             results.append(
@@ -46,4 +66,8 @@ class WorkflowOrchestrator:
 
         final_answer = self.reviewer.run(query, plan, formatted_results)
 
-        return {"input": query, "plan": plan, "results": results, "final": final_answer}
+        save_trace(
+            {"input": query, "plan": plan, "traces": traces, "final": final_answer}
+        )
+
+        return {"input": query, "plan": plan, "traces": traces, "final": final_answer}

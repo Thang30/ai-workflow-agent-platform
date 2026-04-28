@@ -507,6 +507,25 @@
   font-weight: 700;
 }
 
+.tool-card__metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.tool-card__metric {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.32rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.72);
+  color: #cbd5e1;
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
 .tool-card__meta,
 .tool-card__preview {
   line-height: 1.65;
@@ -518,6 +537,47 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.tool-card__details {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+}
+
+.tool-card__details summary {
+  list-style: none;
+  cursor: pointer;
+  color: #dbe8f7;
+  font-weight: 600;
+}
+
+.tool-card__details summary::-webkit-details-marker {
+  display: none;
+}
+
+.tool-card__details summary::after {
+  content: '+';
+  float: right;
+  color: var(--text-soft);
+}
+
+.tool-card__details[open] summary::after {
+  content: '-';
+}
+
+.tool-card__raw {
+  margin-top: 0.8rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.75);
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
 }
 
 .execution-details {

@@ -2,6 +2,10 @@ export type ToolCall = {
   name: string;
   query: string;
   preview: string;
+  raw_output?: unknown;
+  started_at?: string;
+  finished_at?: string;
+  duration_ms?: number;
 };
 
 export type PlanStep = {

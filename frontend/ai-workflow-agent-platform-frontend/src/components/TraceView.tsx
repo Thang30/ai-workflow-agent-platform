@@ -6,6 +6,43 @@ type TraceViewProps = {
   steps: WorkflowStep[];
 };
 
+const formatTimestamp = (timestamp?: string) => {
+  if (!timestamp) {
+    return null;
+  }
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+};
+
+const formatDuration = (durationMs?: number) => {
+  if (durationMs === undefined) {
+    return null;
+  }
+
+  return `${durationMs >= 100 ? Math.round(durationMs) : durationMs.toFixed(2)} ms`;
+};
+
+const formatRawOutput = (rawOutput: unknown) => {
+  if (rawOutput === undefined) {
+    return '';
+  }
+
+  if (typeof rawOutput === 'string') {
+    return rawOutput;
+  }
+
+  return JSON.stringify(rawOutput, null, 2);
+};
+
 export default function TraceView({ steps }: TraceViewProps) {
   const completedSteps = steps.filter((step) => step.status === 'done').length;
 
@@ -60,8 +97,42 @@ export default function TraceView({ steps }: TraceViewProps) {
                       <p className="tool-card__name">{tool.name}</p>
                       <p className="tool-card__label">Query</p>
                       <p className="tool-card__meta">{tool.query}</p>
+
+                      {(tool.started_at ||
+                        tool.finished_at ||
+                        tool.duration_ms !== undefined) && (
+                        <div className="tool-card__metrics">
+                          {tool.started_at && (
+                            <span className="tool-card__metric">
+                              Started {formatTimestamp(tool.started_at)}
+                            </span>
+                          )}
+
+                          {tool.finished_at && (
+                            <span className="tool-card__metric">
+                              Finished {formatTimestamp(tool.finished_at)}
+                            </span>
+                          )}
+
+                          {tool.duration_ms !== undefined && (
+                            <span className="tool-card__metric">
+                              Duration {formatDuration(tool.duration_ms)}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       <p className="tool-card__label">Result preview</p>
                       <p className="tool-card__preview">{tool.preview}</p>
+
+                      {tool.raw_output !== undefined && (
+                        <details className="tool-card__details">
+                          <summary>View raw tool output</summary>
+                          <pre className="tool-card__raw">
+                            {formatRawOutput(tool.raw_output)}
+                          </pre>
+                        </details>
+                      )}
                     </div>
                   ))}
                 </div>

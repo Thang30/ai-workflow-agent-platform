@@ -33,13 +33,13 @@ User query: {query}
 
         if "USE_TOOL" in decision:
             tool_query = _build_tool_query(query)
-            tool_result = web_search(tool_query)
+            tool_result = web_search(tool_query, structured=True)
 
             final_prompt = f"""
 User query: {query}
 
 Tool result:
-{tool_result}
+{tool_result["preview"]}
 
 Generate final answer.
 """
@@ -48,8 +48,12 @@ Generate final answer.
                 "tools": [
                     {
                         "name": "Web Search",
-                        "query": tool_query,
-                        "preview": tool_result,
+                        "query": tool_result["query"],
+                        "preview": tool_result["preview"],
+                        "raw_output": tool_result["raw_output"],
+                        "started_at": tool_result["started_at"],
+                        "finished_at": tool_result["finished_at"],
+                        "duration_ms": tool_result["duration_ms"],
                     }
                 ],
             }

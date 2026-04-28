@@ -32,7 +32,9 @@ export default function TraceView({ steps }: TraceViewProps) {
 
           {s.output && (
             <div className="execution-step__output markdown-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{s.output}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {s.output}
+              </ReactMarkdown>
             </div>
           )}
         </div>

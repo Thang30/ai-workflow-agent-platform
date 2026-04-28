@@ -1,3 +1,6 @@
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
 type WorkflowStep = {
   step: number;
   description: string;
@@ -27,7 +30,11 @@ export default function TraceView({ steps }: TraceViewProps) {
             {s.status === 'running' ? '⏳ Running...' : '✅ Done'}
           </p>
 
-          {s.output && <pre className="execution-step__output">{s.output}</pre>}
+          {s.output && (
+            <div className="execution-step__output markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{s.output}</ReactMarkdown>
+            </div>
+          )}
         </div>
       ))}
     </div>

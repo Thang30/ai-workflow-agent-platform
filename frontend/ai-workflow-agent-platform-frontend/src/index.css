@@ -1,3 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+
+:root {
+  color-scheme: dark;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(37, 99, 235, 0.22),
+      transparent 36%
+    ),
+    radial-gradient(
+      circle at top right,
+      rgba(16, 185, 129, 0.14),
+      transparent 28%
+    ),
+    linear-gradient(180deg, #07111d 0%, #0b1423 48%, #08111d 100%);
+}
+
 /* Reset */
 * {
   margin: 0;
@@ -5,16 +24,50 @@
   box-sizing: border-box;
 }
 
-/* Base */
-body {
-  font-family: Inter, system-ui, sans-serif;
-  background-color: #0f172a; /* dark */
-  color: #e2e8f0;
+html {
+  background: #07111d;
 }
 
-/* Container */
-.container {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 24px;
+/* Base */
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  background: transparent;
+  color: #e7eef8;
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+body::before {
+  background:
+    linear-gradient(rgba(148, 163, 184, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.035) 1px, transparent 1px);
+  background-size: 140px 140px;
+  mask-image: radial-gradient(circle at center, black 34%, transparent 82%);
+}
+
+body::after {
+  inset: auto 6% 10% auto;
+  width: 320px;
+  height: 320px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.18), transparent 72%);
+  filter: blur(42px);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
 }

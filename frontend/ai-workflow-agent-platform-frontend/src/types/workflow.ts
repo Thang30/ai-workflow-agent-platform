@@ -1,0 +1,28 @@
+export type ToolCall = {
+  name: string;
+  query: string;
+  preview: string;
+};
+
+export type PlanStep = {
+  step: number;
+  description: string;
+};
+
+export type WorkflowStep = PlanStep & {
+  status: 'running' | 'done';
+  output: string;
+  tools: ToolCall[];
+};
+
+export type WorkflowMessage =
+  | { event: 'status'; data: string }
+  | { event: 'plan'; data: PlanStep[] }
+  | { event: 'step_start'; data: PlanStep }
+  | {
+      event: 'step_done';
+      data: { step: number; output: string; tools?: ToolCall[] };
+    }
+  | { event: 'final'; data: string };
+
+export type WorkflowEventName = WorkflowMessage['event'];

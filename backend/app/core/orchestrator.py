@@ -33,13 +33,16 @@ class WorkflowOrchestrator:
             {step_desc}
             """
 
-        result = self.executor.run(enriched_input)
+        execution = self.executor.execute(enriched_input)
+        result = execution["output"]
+        tools = execution["tools"]
 
         trace = StepTrace(
             step=step["step"],
             description=step_desc,
             input=enriched_input,
             output=result,
+            tools=tools,
         ).to_dict()
 
         next_context = f"{context}\nStep {step['step']}: {result}\n"
@@ -47,6 +50,7 @@ class WorkflowOrchestrator:
             "step": step["step"],
             "description": step_desc,
             "result": result,
+            "tools": tools,
         }
 
         return result_entry, trace, next_context
@@ -98,6 +102,7 @@ class WorkflowOrchestrator:
 
         plan = self.planner.run(query)
         yield self._stream_event("plan", plan)
+        yield self._stream_event("status", "⚙️ Executing...")
 
         results = []
         traces = []
@@ -115,12 +120,16 @@ class WorkflowOrchestrator:
 
             yield self._stream_event(
                 "step_done",
-                {"step": step["step"], "output": result_entry["result"]},
+                {
+                    "step": step["step"],
+                    "output": result_entry["result"],
+                    "tools": result_entry["tools"],
+                },
             )
 
             await asyncio.sleep(0.1)
 
-        yield self._stream_event("status", "🧠 Reviewing...")
+        yield self._stream_event("status", "🔍 Reviewing...")
 
         final_answer = self._finalize_workflow(query, plan, results, traces)
         yield self._stream_event("final", final_answer)

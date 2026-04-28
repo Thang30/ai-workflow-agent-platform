@@ -1,21 +1,4 @@
-type WorkflowEventName =
-  | 'status'
-  | 'plan'
-  | 'step_start'
-  | 'step_done'
-  | 'final';
-
-type PlanStep = {
-  step: number;
-  description: string;
-};
-
-type WorkflowMessage =
-  | { event: 'status'; data: string }
-  | { event: 'plan'; data: PlanStep[] }
-  | { event: 'step_start'; data: PlanStep }
-  | { event: 'step_done'; data: { step: number; output: string } }
-  | { event: 'final'; data: string };
+import type { WorkflowEventName, WorkflowMessage } from '../types/workflow';
 
 type StreamHandlers = {
   onMessage: (message: WorkflowMessage) => void;

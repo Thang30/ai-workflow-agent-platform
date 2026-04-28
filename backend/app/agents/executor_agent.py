@@ -13,9 +13,9 @@ class ExecutorAgent:
     def __init__(self):
         self.llm = LLMClient()
 
-    def run(self, query: str) -> str:
+    def execute(self, query: str) -> dict:
         """
-        Uses LLM to decide how to respond
+        Executes a workflow step and returns the answer with any tool metadata.
         """
 
         prompt = f"""
@@ -43,6 +43,22 @@ Tool result:
 
 Generate final answer.
 """
-            return self.llm.chat(final_prompt)
+            return {
+                "output": self.llm.chat(final_prompt),
+                "tools": [
+                    {
+                        "name": "Web Search",
+                        "query": tool_query,
+                        "preview": tool_result,
+                    }
+                ],
+            }
 
-        return decision
+        return {"output": decision, "tools": []}
+
+    def run(self, query: str) -> str:
+        """
+        Uses LLM to decide how to respond
+        """
+
+        return self.execute(query)["output"]

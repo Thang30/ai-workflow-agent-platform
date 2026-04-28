@@ -13,3 +13,6 @@ pydantic_settings==2.13.1
 
 # for streaming responses
 sse-starlette==3.4.1
+
+# for web search tool
+tavily-python==0.7.24

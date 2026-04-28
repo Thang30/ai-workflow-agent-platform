@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import './App.css';
 import { streamWorkflow } from './api/client';
 import ChatInput from './components/ChatInput';
 import PlanView from './components/PlanView';

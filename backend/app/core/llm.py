@@ -4,7 +4,6 @@ from .config import settings
 
 class LLMClient:
     def __init__(self):
-        print("The token is:", settings.hf_token)
         print("The model is:", settings.model)
         self.client = InferenceClient(api_key=settings.hf_token)
         self.model = settings.model

@@ -1,6 +1,14 @@
 from app.core.llm import LLMClient
 from app.tools.web_search import web_search
 
+
+def _build_tool_query(query: str) -> str:
+    if "Current step:" in query:
+        return query.split("Current step:", 1)[1].strip()
+
+    return query.strip()
+
+
 class ExecutorAgent:
     def __init__(self):
         self.llm = LLMClient()
@@ -24,7 +32,8 @@ User query: {query}
         decision = self.llm.chat(prompt)
 
         if "USE_TOOL" in decision:
-            tool_result = web_search(query)
+            tool_query = _build_tool_query(query)
+            tool_result = web_search(tool_query)
 
             final_prompt = f"""
 User query: {query}

@@ -91,3 +91,73 @@ class WorkflowRunStats:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass(slots=True)
+class AnalyticsSummary:
+    total_runs: int
+    average_score: float | None
+    failure_rate: float | None
+    average_duration_ms: float | None
+    p95_duration_ms: int | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class AnalyticsTimeSeriesPoint:
+    date: str
+    total_runs: int
+    average_score: float | None
+    failure_rate: float | None
+    average_duration_ms: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class AnalyticsTimeSeries:
+    items: list[AnalyticsTimeSeriesPoint]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"items": [item.to_dict() for item in self.items]}
+
+
+@dataclass(slots=True)
+class AnalyticsDistributionBucket:
+    key: str
+    label: str
+    count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class AnalyticsDistribution:
+    items: list[AnalyticsDistributionBucket]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"items": [item.to_dict() for item in self.items]}
+
+
+@dataclass(slots=True)
+class AnalyticsToolUsage:
+    name: str
+    call_count: int
+    run_count: int
+    share: float
+    average_duration_ms: float | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class AnalyticsToolUsageList:
+    items: list[AnalyticsToolUsage]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"items": [item.to_dict() for item in self.items]}

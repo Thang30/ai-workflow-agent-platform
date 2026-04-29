@@ -156,6 +156,18 @@ class WorkflowOrchestrator:
     def get_run_stats(self) -> dict:
         return self.repository.get_run_stats().to_dict()
 
+    def get_analytics_summary(self, days: int = 7) -> dict:
+        return self.repository.get_analytics_summary(days=days).to_dict()
+
+    def get_analytics_timeseries(self, days: int = 7) -> dict:
+        return self.repository.get_analytics_timeseries(days=days).to_dict()
+
+    def get_analytics_distribution(self, days: int = 7) -> dict:
+        return self.repository.get_analytics_distribution(days=days).to_dict()
+
+    def get_analytics_tools(self, days: int = 7) -> dict:
+        return self.repository.get_analytics_tools(days=days).to_dict()
+
     def run(self, query: str):
         """
         Full workflow:

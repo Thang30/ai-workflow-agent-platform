@@ -1,8 +1,11 @@
+import { Suspense, lazy } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 
 import './App.css';
 import LiveWorkflowPage from './pages/LiveWorkflowPage';
 import RunHistoryPage from './pages/RunHistoryPage';
+
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage'));
 
 function App() {
   return (
@@ -31,12 +34,34 @@ function App() {
           >
             Run history
           </NavLink>
+          <NavLink
+            to="/analytics"
+            className={({ isActive }) =>
+              `app-nav__link${isActive ? ' app-nav__link--active' : ''}`
+            }
+          >
+            Analytics
+          </NavLink>
         </nav>
       </header>
 
       <Routes>
         <Route path="/" element={<LiveWorkflowPage />} />
         <Route path="/history" element={<RunHistoryPage />} />
+        <Route
+          path="/analytics"
+          element={
+            <Suspense
+              fallback={
+                <div className="empty-state">
+                  Loading analytics dashboard...
+                </div>
+              }
+            >
+              <AnalyticsPage />
+            </Suspense>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>

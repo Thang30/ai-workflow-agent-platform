@@ -29,9 +29,9 @@ class WorkflowRunModel(Base):
         server_default=text("'[]'::jsonb"),
     )
     final_answer: Mapped[str | None] = mapped_column(Text)
-    evaluation_score: Mapped[int | None] = mapped_column(Integer)
+    evaluation_score: Mapped[int | None] = mapped_column(Integer, index=True)
     evaluation_reason: Mapped[str | None] = mapped_column(Text)
-    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, index=True)
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -45,4 +45,7 @@ class WorkflowRunModel(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+    )

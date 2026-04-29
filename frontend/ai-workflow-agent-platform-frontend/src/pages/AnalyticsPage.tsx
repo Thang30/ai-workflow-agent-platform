@@ -17,12 +17,15 @@ import {
 
 import {
   getAnalyticsDistribution,
+  getAnalyticsExperimentSummary,
   getAnalyticsSummary,
   getAnalyticsTimeseries,
   getAnalyticsTools,
 } from '../api/client';
 import type {
   AnalyticsDistribution,
+  AnalyticsExperimentSummary,
+  AnalyticsExperimentVariantSummary,
   AnalyticsSummary,
   AnalyticsTimeSeries,
   AnalyticsToolUsageList,
@@ -145,6 +148,29 @@ const formatTooltipValue = (
   return [value, label];
 };
 
+const formatExperimentType = (value: string) => {
+  return value === 'prompt' ? 'Planner prompt split' : 'Model split';
+};
+
+const getExperimentVariantDetail = (
+  variant: AnalyticsExperimentVariantSummary,
+) => {
+  const model = variant.variant_config.model;
+  if (typeof model === 'string' && model.trim()) {
+    return model;
+  }
+
+  const promptText = variant.variant_config.prompt_text;
+  if (typeof promptText === 'string' && promptText.trim()) {
+    const normalizedPrompt = promptText.replace(/\s+/g, ' ').trim();
+    return normalizedPrompt.length > 180
+      ? `${normalizedPrompt.slice(0, 180).trimEnd()}…`
+      : normalizedPrompt;
+  }
+
+  return 'Current experiment variant';
+};
+
 const buildInsights = (
   summary: AnalyticsSummary | null,
   timeseries: AnalyticsTimeSeries | null,
@@ -245,6 +271,8 @@ export default function AnalyticsPage() {
   const [distribution, setDistribution] =
     useState<AnalyticsDistribution | null>(null);
   const [tools, setTools] = useState<AnalyticsToolUsageList | null>(null);
+  const [experimentSummary, setExperimentSummary] =
+    useState<AnalyticsExperimentSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -254,23 +282,31 @@ export default function AnalyticsPage() {
       setError('');
 
       try {
-        const [summaryData, timeseriesData, distributionData, toolsData] =
-          await Promise.all([
-            getAnalyticsSummary(days),
-            getAnalyticsTimeseries(days),
-            getAnalyticsDistribution(days),
-            getAnalyticsTools(days),
-          ]);
+        const [
+          summaryData,
+          timeseriesData,
+          distributionData,
+          toolsData,
+          experimentSummaryData,
+        ] = await Promise.all([
+          getAnalyticsSummary(days),
+          getAnalyticsTimeseries(days),
+          getAnalyticsDistribution(days),
+          getAnalyticsTools(days),
+          getAnalyticsExperimentSummary(days),
+        ]);
 
         setSummary(summaryData);
         setTimeseries(timeseriesData);
         setDistribution(distributionData);
         setTools(toolsData);
+        setExperimentSummary(experimentSummaryData);
       } catch {
         setSummary(null);
         setTimeseries(null);
         setDistribution(null);
         setTools(null);
+        setExperimentSummary(null);
         setError('Unable to load analytics right now.');
       } finally {
         setIsLoading(false);
@@ -410,6 +446,58 @@ export default function AnalyticsPage() {
             {formatImprovement(summary?.average_score_improvement ?? null)}
           </p>
         </article>
+      </section>
+
+      <section className="workspace-panel analytics-experiment-panel">
+        <div className="panel-banner">
+          <div>
+            <p className="panel-banner__eyebrow">Experiment</p>
+            <h2>Active split</h2>
+          </div>
+
+          <p className="panel-banner__copy">
+            {isLoading
+              ? 'Loading the current experiment summary...'
+              : experimentSummary
+                ? `${experimentSummary.experiment_name} · ${formatExperimentType(experimentSummary.experiment_type)}`
+                : 'No active experiment is configured in the backend settings.'}
+          </p>
+        </div>
+
+        {isLoading ? (
+          <div className="empty-state">
+            Loading active experiment summary...
+          </div>
+        ) : experimentSummary ? (
+          <div className="analytics-experiment-grid">
+            {experimentSummary.variants.map((variant) => (
+              <article
+                key={variant.variant_name}
+                className="analytics-experiment-card"
+              >
+                <p className="section-card__eyebrow">
+                  Variant {variant.variant_name}
+                </p>
+                <p className="analytics-experiment-card__preview">
+                  {getExperimentVariantDetail(variant)}
+                </p>
+                <div className="analytics-experiment-metrics">
+                  <p>Runs: {variant.run_count}</p>
+                  <p>Average score: {formatScore(variant.average_score)}</p>
+                  <p>Failure rate: {formatRate(variant.failure_rate)}</p>
+                  <p>
+                    Average time: {formatDuration(variant.average_duration_ms)}
+                  </p>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state">
+            Enable the backend experiment settings to route new runs through a
+            single active split and view the variant metrics here.
+          </div>
+        )}
       </section>
 
       <main className="analytics-grid">

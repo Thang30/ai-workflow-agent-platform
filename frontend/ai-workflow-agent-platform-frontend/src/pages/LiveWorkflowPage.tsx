@@ -6,6 +6,7 @@ import FinalAnswer from '../components/FinalAnswer';
 import PlanView from '../components/PlanView';
 import TraceView from '../components/TraceView';
 import type {
+  ExperimentAssignment,
   PlanStep,
   WorkflowAttempt,
   WorkflowMessage,
@@ -49,6 +50,8 @@ export default function LiveWorkflowPage() {
   const [currentAttemptNumber, setCurrentAttemptNumber] = useState<
     number | null
   >(null);
+  const [assignedExperiment, setAssignedExperiment] =
+    useState<ExperimentAssignment | null>(null);
   const [status, setStatus] = useState('');
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -62,12 +65,17 @@ export default function LiveWorkflowPage() {
     setWorkflowRun(null);
     setAttempts([]);
     setCurrentAttemptNumber(null);
+    setAssignedExperiment(null);
 
     const eventSource = streamWorkflow(query, {
       onMessage: (msg: WorkflowMessage) => {
         switch (msg.event) {
           case 'status':
             setStatus(msg.data);
+            break;
+
+          case 'experiment_assigned':
+            setAssignedExperiment(msg.data);
             break;
 
           case 'attempt_start':
@@ -164,6 +172,7 @@ export default function LiveWorkflowPage() {
             completed = true;
             setWorkflowRun(msg.data.workflow_run);
             setAttempts(msg.data.attempts);
+            setAssignedExperiment(msg.data.workflow_run?.experiment ?? null);
 
             const selectedAttempt = getSelectedAttempt(msg.data);
             setCurrentAttemptNumber(
@@ -224,6 +233,10 @@ export default function LiveWorkflowPage() {
     status !== 'Completed' &&
     status !== 'Failed' &&
     status !== 'Stream disconnected';
+  const currentExperiment =
+    selectedAttempt?.experiment ??
+    workflowRun?.experiment ??
+    assignedExperiment;
 
   const stages = [
     {
@@ -342,6 +355,16 @@ export default function LiveWorkflowPage() {
             />
             <span>{status || 'Waiting for a workflow request.'}</span>
           </div>
+
+          {currentExperiment ? (
+            <div className="experiment-context">
+              <span className="experiment-context__badge">Experiment</span>
+              <p className="experiment-context__copy">
+                {currentExperiment.experiment_name} · Variant{' '}
+                {currentExperiment.variant_name}
+              </p>
+            </div>
+          ) : null}
 
           <PlanView plan={plan} steps={steps} />
           <TraceView steps={steps} />

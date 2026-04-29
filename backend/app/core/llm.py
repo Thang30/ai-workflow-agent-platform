@@ -1,19 +1,16 @@
 from huggingface_hub import InferenceClient
-from .config import settings 
+from .config import settings
 
 
 class LLMClient:
-    def __init__(self):
-        print("The model is:", settings.model)
+    def __init__(self, model: str | None = None):
         self.client = InferenceClient(api_key=settings.hf_token)
-        self.model = settings.model
+        self.model = model or settings.model
 
-    def chat(self, message: str) -> str:
+    def chat(self, message: str, model: str | None = None) -> str:
         response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "user", "content": message}
-            ],
+            model=model or self.model,
+            messages=[{"role": "user", "content": message}],
         )
 
         return response.choices[0].message.content

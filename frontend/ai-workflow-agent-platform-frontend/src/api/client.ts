@@ -2,6 +2,7 @@ import axios from 'axios';
 
 import type {
   AnalyticsDistribution,
+  AnalyticsExperimentSummary,
   AnalyticsSummary,
   AnalyticsTimeSeries,
   AnalyticsToolUsageList,
@@ -29,6 +30,7 @@ export const streamWorkflow = (query: string, handlers: StreamHandlers) => {
 
   const events: WorkflowEventName[] = [
     'status',
+    'experiment_assigned',
     'attempt_start',
     'attempt_complete',
     'plan',
@@ -101,6 +103,17 @@ export const getAnalyticsDistribution = async (days = 7) => {
 export const getAnalyticsTools = async (days = 7) => {
   const response = await apiClient.get<AnalyticsToolUsageList>(
     '/analytics/tools',
+    {
+      params: { days },
+    },
+  );
+
+  return response.data;
+};
+
+export const getAnalyticsExperimentSummary = async (days = 7) => {
+  const response = await apiClient.get<AnalyticsExperimentSummary | null>(
+    '/analytics/experiment-summary',
     {
       params: { days },
     },

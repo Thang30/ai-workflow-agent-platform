@@ -43,6 +43,17 @@ class Settings(DatabaseSettings):
     tavily_api_key: str | None = None
     self_improvement_low_score_threshold: int = 7
     self_improvement_max_retries: int = 1
+    experiment_enabled: bool = False
+    experiment_name: str | None = None
+    experiment_type: str | None = None
+    experiment_variant_a_name: str = "A"
+    experiment_variant_b_name: str = "B"
+    experiment_variant_a_model: str | None = None
+    experiment_variant_b_model: str | None = None
+    experiment_variant_a_planner_prompt: str | None = None
+    experiment_variant_b_planner_prompt: str | None = None
+    experiment_variant_a_planner_prompt_file: str | None = None
+    experiment_variant_b_planner_prompt_file: str | None = None
     frontend_origins: list[str] = Field(default_factory=_default_frontend_origins)
     frontend_origin_regex: str = (
         r"https://ai-workflow-agent-platform-frontend(?:-[a-z0-9-]+)?\.vercel\.app"

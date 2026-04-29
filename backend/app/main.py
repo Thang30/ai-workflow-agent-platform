@@ -95,6 +95,11 @@ def analytics_tools(days: int = Query(default=7, ge=1, le=90)):
     return orchestrator.get_analytics_tools(days=days)
 
 
+@app.get("/analytics/experiment-summary")
+def analytics_experiment_summary(days: int = Query(default=7, ge=1, le=90)):
+    return orchestrator.get_active_experiment_summary(days=days)
+
+
 @app.get("/runs/{run_id}")
 def workflow_run(run_id: UUID):
     result = orchestrator.get_run(str(run_id))

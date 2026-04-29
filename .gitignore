@@ -42,6 +42,8 @@ lerna-debug.log*
 # --- General / OS ---
 # Environment variables (Sensitive Info!)
 .env*
+!.env.example
+!**/.env.example
 
 # IDEs and Editors
 .vscode/

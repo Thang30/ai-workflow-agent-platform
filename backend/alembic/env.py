@@ -7,6 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import database_settings
 from app.core.db import Base
+import app.models.experiment  # noqa: F401
 import app.models.workflow_run  # noqa: F401
 
 config = context.config

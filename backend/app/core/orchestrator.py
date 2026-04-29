@@ -2,10 +2,11 @@ import asyncio
 import json
 from datetime import datetime
 
+from app.agents.evaluation_agent import EvaluationAgent
 from app.agents.planner_agent import PlannerAgent
 from app.agents.executor_agent import ExecutorAgent
 from app.agents.reviewer_agent import ReviewerAgent
-from app.models.trace import StepTrace
+from app.models.trace import StepTrace, WorkflowRun
 
 
 def save_trace(data):
@@ -19,6 +20,7 @@ class WorkflowOrchestrator:
         self.planner = PlannerAgent()
         self.executor = ExecutorAgent()
         self.reviewer = ReviewerAgent()
+        self.evaluator = EvaluationAgent()
 
     def _stream_event(self, event: str, data):
         return {"event": event, "data": json.dumps(data, ensure_ascii=False)}
@@ -55,24 +57,44 @@ class WorkflowOrchestrator:
 
         return result_entry, trace, next_context
 
-    def _finalize_workflow(
+    def _review_workflow(
         self,
         query: str,
         plan: list,
         results: list,
-        traces: list,
     ) -> str:
         formatted_results = "\n".join(
             [f"Step {result['step']}: {result['result']}" for result in results]
         )
 
-        final_answer = self.reviewer.run(query, plan, formatted_results)
+        return self.reviewer.run(query, plan, formatted_results)
 
-        save_trace(
-            {"input": query, "plan": plan, "traces": traces, "final": final_answer}
+    def _evaluate_workflow(self, query: str, final_answer: str) -> WorkflowRun:
+        evaluation = self.evaluator.run(query, final_answer)
+
+        return WorkflowRun(
+            query=query,
+            final_answer=final_answer,
+            evaluation_score=evaluation["score"],
+            evaluation_reason=evaluation["reasoning"],
         )
 
-        return final_answer
+    def _save_workflow_run(
+        self,
+        query: str,
+        plan: list,
+        traces: list,
+        workflow_run: WorkflowRun,
+    ):
+        save_trace(
+            {
+                "input": query,
+                "plan": plan,
+                "traces": traces,
+                "final": workflow_run.final_answer,
+                "workflow_run": workflow_run.to_dict(),
+            }
+        )
 
     def run(self, query: str):
         """
@@ -93,9 +115,17 @@ class WorkflowOrchestrator:
             traces.append(trace)
             results.append(result_entry)
 
-        final_answer = self._finalize_workflow(query, plan, results, traces)
+        final_answer = self._review_workflow(query, plan, results)
+        workflow_run = self._evaluate_workflow(query, final_answer)
+        self._save_workflow_run(query, plan, traces, workflow_run)
 
-        return {"input": query, "plan": plan, "traces": traces, "final": final_answer}
+        return {
+            "input": query,
+            "plan": plan,
+            "traces": traces,
+            "final": workflow_run.final_answer,
+            "workflow_run": workflow_run.to_dict(),
+        }
 
     async def stream_events(self, query: str):
         yield self._stream_event("status", "🧠 Planning...")
@@ -131,5 +161,11 @@ class WorkflowOrchestrator:
 
         yield self._stream_event("status", "🔍 Reviewing...")
 
-        final_answer = self._finalize_workflow(query, plan, results, traces)
-        yield self._stream_event("final", final_answer)
+        final_answer = self._review_workflow(query, plan, results)
+
+        yield self._stream_event("status", "📏 Evaluating...")
+
+        workflow_run = self._evaluate_workflow(query, final_answer)
+        self._save_workflow_run(query, plan, traces, workflow_run)
+
+        yield self._stream_event("final", workflow_run.to_dict())

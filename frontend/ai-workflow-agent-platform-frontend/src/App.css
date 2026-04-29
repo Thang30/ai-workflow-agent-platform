@@ -31,6 +31,7 @@
 .composer__eyebrow,
 .timeline-card__label,
 .execution-card__eyebrow,
+.answer-evaluation__eyebrow,
 .answer-body__eyebrow,
 .answer-empty__eyebrow,
 .tool-card__label {
@@ -62,6 +63,7 @@
 .composer__eyebrow,
 .timeline-card__label,
 .execution-card__eyebrow,
+.answer-evaluation__eyebrow,
 .answer-body__eyebrow,
 .answer-empty__eyebrow,
 .tool-card__label {
@@ -239,7 +241,7 @@
 
 .status-board {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 0.8rem;
   margin-bottom: 1rem;
 }
@@ -619,6 +621,48 @@
   padding: 1.25rem;
 }
 
+.answer-evaluation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  margin-top: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(52, 211, 153, 0.18);
+  background: rgba(5, 150, 105, 0.08);
+}
+
+.answer-evaluation__score-block {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.answer-evaluation__score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  color: #d1fae5;
+}
+
+.answer-evaluation__value {
+  font-size: 1.55rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.answer-evaluation__max {
+  color: rgba(209, 250, 229, 0.72);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.answer-evaluation__reason {
+  color: var(--text-soft);
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+
 .answer-body {
   margin-top: 1.05rem;
   padding: 1.35rem;
@@ -780,6 +824,10 @@
 
   .section-card__meta {
     text-align: left;
+  }
+
+  .answer-evaluation {
+    grid-template-columns: 1fr;
   }
 }
 

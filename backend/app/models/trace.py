@@ -24,3 +24,25 @@ class StepTrace:
             "output": self.output,
             "tools": self.tools,
         }
+
+
+class WorkflowRun:
+    def __init__(
+        self,
+        query: str,
+        final_answer: str,
+        evaluation_score: int,
+        evaluation_reason: str,
+    ):
+        self.query = query
+        self.final_answer = final_answer
+        self.evaluation_score = evaluation_score
+        self.evaluation_reason = evaluation_reason
+
+    def to_dict(self):
+        return {
+            "query": self.query,
+            "final_answer": self.final_answer,
+            "evaluation_score": self.evaluation_score,
+            "evaluation_reason": self.evaluation_reason,
+        }

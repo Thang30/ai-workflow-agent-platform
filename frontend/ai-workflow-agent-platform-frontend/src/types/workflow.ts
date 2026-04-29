@@ -19,6 +19,13 @@ export type WorkflowStep = PlanStep & {
   tools: ToolCall[];
 };
 
+export type WorkflowRun = {
+  query: string;
+  final_answer: string;
+  evaluation_score: number;
+  evaluation_reason: string;
+};
+
 export type WorkflowMessage =
   | { event: 'status'; data: string }
   | { event: 'plan'; data: PlanStep[] }
@@ -27,6 +34,6 @@ export type WorkflowMessage =
       event: 'step_done';
       data: { step: number; output: string; tools?: ToolCall[] };
     }
-  | { event: 'final'; data: string };
+  | { event: 'final'; data: WorkflowRun };
 
 export type WorkflowEventName = WorkflowMessage['event'];

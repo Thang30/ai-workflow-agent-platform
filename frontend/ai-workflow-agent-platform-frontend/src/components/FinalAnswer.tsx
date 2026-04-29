@@ -1,12 +1,15 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import type { WorkflowRun } from '../types/workflow';
 
 type FinalAnswerProps = {
-  answer: string;
+  workflowRun: WorkflowRun | null;
   status: string;
 };
 
-export default function FinalAnswer({ answer, status }: FinalAnswerProps) {
+export default function FinalAnswer({ workflowRun, status }: FinalAnswerProps) {
+  const answer = workflowRun?.final_answer ?? '';
+
   return (
     <section className="answer-card">
       <div className="answer-card__header">
@@ -21,12 +24,34 @@ export default function FinalAnswer({ answer, status }: FinalAnswerProps) {
       </div>
 
       {answer ? (
-        <div className="answer-body">
-          <p className="answer-body__eyebrow">Structured response</p>
-          <div className="markdown-body answer-markdown">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+        <>
+          {workflowRun ? (
+            <div className="answer-evaluation">
+              <div className="answer-evaluation__score-block">
+                <p className="answer-evaluation__eyebrow">Evaluator</p>
+                <div className="answer-evaluation__score">
+                  <span className="answer-evaluation__value">
+                    {workflowRun.evaluation_score}
+                  </span>
+                  <span className="answer-evaluation__max">/10</span>
+                </div>
+              </div>
+
+              <p className="answer-evaluation__reason">
+                {workflowRun.evaluation_reason}
+              </p>
+            </div>
+          ) : null}
+
+          <div className="answer-body">
+            <p className="answer-body__eyebrow">Structured response</p>
+            <div className="markdown-body answer-markdown">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {answer}
+              </ReactMarkdown>
+            </div>
           </div>
-        </div>
+        </>
       ) : (
         <div className="answer-empty">
           <div className="answer-empty__panel">
@@ -36,8 +61,8 @@ export default function FinalAnswer({ answer, status }: FinalAnswerProps) {
             </h4>
             <p className="answer-empty__copy">
               The planner outlines the work, the executor runs the steps, and
-              the reviewer synthesizes the final answer once the trace is
-              complete.
+              the reviewer synthesizes the final answer before the evaluator
+              scores it.
             </p>
           </div>
         </div>

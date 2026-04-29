@@ -5,12 +5,17 @@ import ChatInput from './components/ChatInput';
 import PlanView from './components/PlanView';
 import TraceView from './components/TraceView';
 import FinalAnswer from './components/FinalAnswer';
-import type { PlanStep, WorkflowMessage, WorkflowStep } from './types/workflow';
+import type {
+  PlanStep,
+  WorkflowMessage,
+  WorkflowRun,
+  WorkflowStep,
+} from './types/workflow';
 
 function App() {
   const [plan, setPlan] = useState<PlanStep[]>([]);
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
-  const [final, setFinal] = useState('');
+  const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
   const [status, setStatus] = useState('');
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -21,7 +26,7 @@ function App() {
     setStatus('Connecting...');
     setPlan([]);
     setSteps([]);
-    setFinal('');
+    setWorkflowRun(null);
 
     const eventSource = streamWorkflow(query, {
       onMessage: (msg: WorkflowMessage) => {
@@ -95,7 +100,7 @@ function App() {
 
           case 'final':
             completed = true;
-            setFinal(msg.data);
+            setWorkflowRun(msg.data);
             setStatus('Completed');
             eventSourceRef.current?.close();
             eventSourceRef.current = null;
@@ -152,7 +157,10 @@ function App() {
           : 'Runs steps and calls tools',
       tone: status.includes('Executing')
         ? 'active'
-        : steps.length > 0 && (Boolean(final) || status.includes('Reviewing'))
+        : steps.length > 0 &&
+            (Boolean(workflowRun) ||
+              status.includes('Reviewing') ||
+              status.includes('Evaluating'))
           ? 'done'
           : steps.length > 0
             ? 'active'
@@ -161,10 +169,27 @@ function App() {
     {
       icon: '🔍',
       label: 'Reviewer',
-      detail: final
-        ? 'Final answer synthesized'
-        : 'Shapes the response for delivery',
-      tone: status.includes('Reviewing') ? 'active' : final ? 'done' : 'idle',
+      detail:
+        workflowRun || status.includes('Evaluating')
+          ? 'Final answer synthesized'
+          : 'Shapes the response for delivery',
+      tone: status.includes('Reviewing')
+        ? 'active'
+        : workflowRun || status.includes('Evaluating')
+          ? 'done'
+          : 'idle',
+    },
+    {
+      icon: '📏',
+      label: 'Evaluator',
+      detail: workflowRun
+        ? `${workflowRun.evaluation_score}/10 with rationale`
+        : 'Scores the answer and explains why',
+      tone: status.includes('Evaluating')
+        ? 'active'
+        : workflowRun
+          ? 'done'
+          : 'idle',
     },
   ] as const;
 
@@ -173,12 +198,14 @@ function App() {
       <header className="hero">
         <div className="hero__badge">Portfolio workflow demo</div>
         <div className="hero__content">
-          <p className="hero__eyebrow">Planner - Executor - Reviewer</p>
+          <p className="hero__eyebrow">
+            Planner - Executor - Reviewer - Evaluator
+          </p>
           <h1>AI Workflow Agent Platform</h1>
           <p className="hero__lede">
             A process-first interface that shows how the system plans work,
-            executes steps, uses tools, and delivers a reviewed answer in real
-            time.
+            executes steps, uses tools, and delivers a reviewed and scored
+            answer in real time.
           </p>
         </div>
       </header>
@@ -234,11 +261,11 @@ function App() {
 
             <p className="panel-banner__copy">
               The reviewer consolidates every step into a clean, polished final
-              response.
+              response, and the evaluator adds a light-touch quality check.
             </p>
           </div>
 
-          <FinalAnswer answer={final} status={status} />
+          <FinalAnswer workflowRun={workflowRun} status={status} />
         </section>
       </main>
     </div>

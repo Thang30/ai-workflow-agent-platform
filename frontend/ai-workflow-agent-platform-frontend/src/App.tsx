@@ -51,7 +51,13 @@ function App() {
         <Route
           path="/analytics"
           element={
-            <Suspense fallback={<div className="empty-state">Loading analytics dashboard...</div>}>
+            <Suspense
+              fallback={
+                <div className="empty-state">
+                  Loading analytics dashboard...
+                </div>
+              }
+            >
               <AnalyticsPage />
             </Suspense>
           }

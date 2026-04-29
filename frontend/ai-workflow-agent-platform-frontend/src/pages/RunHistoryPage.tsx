@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState } from 'react';
+import { startTransition, useCallback, useEffect, useState } from 'react';
 
 import { getRun, getRunStats, listRuns } from '../api/client';
 import FinalAnswer from '../components/FinalAnswer';
@@ -79,77 +79,109 @@ export default function RunHistoryPage() {
   const [listError, setListError] = useState('');
   const [detailError, setDetailError] = useState('');
 
-  const loadRunDetail = async (runId: string) => {
-    setIsDetailLoading(true);
-    setDetailError('');
-
+  const loadRunDetail = useCallback(async (runId: string) => {
     try {
       const data = await getRun(runId);
       setSelectedRun(data);
+      setDetailError('');
     } catch {
       setSelectedRun(null);
       setDetailError('Unable to load the selected workflow run.');
     } finally {
       setIsDetailLoading(false);
     }
-  };
+  }, []);
 
-  const refreshHistory = async () => {
-    setIsListLoading(true);
-    setListError('');
+  const refreshHistory = useCallback(
+    async (currentSelectedRunId: string | null) => {
+      try {
+        const [statsData, runList] = await Promise.all([
+          getRunStats(),
+          listRuns(1, HISTORY_PAGE_SIZE),
+        ]);
 
-    try {
-      const [statsData, runList] = await Promise.all([
-        getRunStats(),
-        listRuns(1, HISTORY_PAGE_SIZE),
-      ]);
+        setStats(statsData);
+        setRuns(runList.items);
 
-      setStats(statsData);
-      setRuns(runList.items);
+        const nextSelectedRunId = runList.items.some(
+          (run) => run.id === currentSelectedRunId,
+        )
+          ? currentSelectedRunId
+          : (runList.items[0]?.id ?? null);
 
-      const nextSelectedRunId = runList.items.some(
-        (run) => run.id === selectedRunId,
-      )
-        ? selectedRunId
-        : (runList.items[0]?.id ?? null);
+        if (!nextSelectedRunId) {
+          setSelectedRun(null);
+          setDetailError('');
+          setIsDetailLoading(false);
 
-      if (nextSelectedRunId && nextSelectedRunId === selectedRunId) {
-        await loadRunDetail(nextSelectedRunId);
-      } else {
+          if (currentSelectedRunId !== null) {
+            startTransition(() => {
+              setSelectedRunId(null);
+            });
+          }
+
+          return;
+        }
+
+        setIsDetailLoading(true);
+        setDetailError('');
+
         startTransition(() => {
           setSelectedRunId(nextSelectedRunId);
         });
-      }
 
-      if (!nextSelectedRunId) {
+        await loadRunDetail(nextSelectedRunId);
+      } catch {
+        setRuns([]);
+        setStats(null);
         setSelectedRun(null);
+        setDetailError('');
+        setIsDetailLoading(false);
+        setListError('Unable to load workflow history right now.');
+        startTransition(() => {
+          setSelectedRunId(null);
+        });
+      } finally {
+        setIsListLoading(false);
       }
-    } catch {
-      setRuns([]);
-      setStats(null);
-      setSelectedRun(null);
-      setListError('Unable to load workflow history right now.');
-      startTransition(() => {
-        setSelectedRunId(null);
-      });
-    } finally {
-      setIsListLoading(false);
-    }
+    },
+    [loadRunDetail],
+  );
+
+  const handleRefresh = () => {
+    setIsListLoading(true);
+    setListError('');
+    void refreshHistory(selectedRunId);
   };
 
-  useEffect(() => {
-    void refreshHistory();
-  }, []);
-
-  useEffect(() => {
-    if (!selectedRunId) {
-      setSelectedRun(null);
-      setDetailError('');
+  const handleSelectRun = (runId: string) => {
+    if (runId === selectedRunId) {
       return;
     }
 
-    void loadRunDetail(selectedRunId);
-  }, [selectedRunId]);
+    setIsDetailLoading(true);
+    setDetailError('');
+
+    startTransition(() => {
+      setSelectedRunId(runId);
+    });
+
+    void loadRunDetail(runId);
+  };
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    queueMicrotask(() => {
+      if (!isCancelled) {
+        void refreshHistory(null);
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [refreshHistory]);
 
   const selectedSummary = runs.find((run) => run.id === selectedRunId) ?? null;
   const detailRun = selectedRun?.workflow_run;
@@ -204,9 +236,7 @@ export default function RunHistoryPage() {
               <button
                 type="button"
                 className="history-refresh"
-                onClick={() => {
-                  void refreshHistory();
-                }}
+                onClick={handleRefresh}
               >
                 Refresh
               </button>
@@ -230,9 +260,7 @@ export default function RunHistoryPage() {
                   type="button"
                   className={`history-list__item${run.id === selectedRunId ? ' history-list__item--selected' : ''}`}
                   onClick={() => {
-                    startTransition(() => {
-                      setSelectedRunId(run.id);
-                    });
+                    handleSelectRun(run.id);
                   }}
                 >
                   <div className="history-list__top">

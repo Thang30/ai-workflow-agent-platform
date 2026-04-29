@@ -94,7 +94,10 @@ const formatChartDay = (value: string) => {
   return chartDateFormatter.format(date);
 };
 
-const formatTooltipValue = (value: number | string | null | undefined, label: string) => {
+const formatTooltipValue = (
+  value: number | string | null | undefined,
+  label: string,
+) => {
   if (typeof value !== 'number') {
     return [value ?? '—', label];
   }
@@ -127,28 +130,34 @@ const buildInsights = (
 
   if (summary?.average_score !== null && summary?.average_score !== undefined) {
     if (summary.average_score >= 8) {
-      insights.push('Average score is in the strong band for the selected window.');
+      insights.push(
+        'Average score is in the strong band for the selected window.',
+      );
     } else if (summary.average_score < 6) {
-      insights.push('Average score is below the current pass threshold and needs attention.');
+      insights.push(
+        'Average score is below the current pass threshold and needs attention.',
+      );
     }
   }
 
   if (summary?.failure_rate !== null && summary?.failure_rate !== undefined) {
     if (summary.failure_rate >= 0.25) {
-      insights.push('Failure rate is elevated for this window, so reliability is the first thing to inspect.');
+      insights.push(
+        'Failure rate is elevated for this window, so reliability is the first thing to inspect.',
+      );
     } else if (summary.failure_rate <= 0.1) {
-      insights.push('Failure rate is low in this window, which suggests the workflow is operating steadily.');
+      insights.push(
+        'Failure rate is low in this window, which suggests the workflow is operating steadily.',
+      );
     }
   }
 
-  const activePoints = timeseries?.items.filter((item) => item.total_runs > 0) ?? [];
+  const activePoints =
+    timeseries?.items.filter((item) => item.total_runs > 0) ?? [];
   if (activePoints.length >= 2) {
     const firstPoint = activePoints[0];
     const lastPoint = activePoints[activePoints.length - 1];
-    if (
-      firstPoint.average_score !== null &&
-      lastPoint.average_score !== null
-    ) {
+    if (firstPoint.average_score !== null && lastPoint.average_score !== null) {
       const delta = lastPoint.average_score - firstPoint.average_score;
       if (Math.abs(delta) >= 0.25) {
         insights.push(
@@ -179,8 +188,11 @@ const buildInsights = (
 export default function AnalyticsPage() {
   const [days, setDays] = useState<AnalyticsWindow>(7);
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
-  const [timeseries, setTimeseries] = useState<AnalyticsTimeSeries | null>(null);
-  const [distribution, setDistribution] = useState<AnalyticsDistribution | null>(null);
+  const [timeseries, setTimeseries] = useState<AnalyticsTimeSeries | null>(
+    null,
+  );
+  const [distribution, setDistribution] =
+    useState<AnalyticsDistribution | null>(null);
   const [tools, setTools] = useState<AnalyticsToolUsageList | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -222,15 +234,23 @@ export default function AnalyticsPage() {
     ...item,
     label: formatChartDay(item.date),
     failure_rate_percent:
-      item.failure_rate === null ? null : Number((item.failure_rate * 100).toFixed(1)),
+      item.failure_rate === null
+        ? null
+        : Number((item.failure_rate * 100).toFixed(1)),
   }));
-  const hasTimeseriesData = timeseriesChartData.some((item) => item.total_runs > 0);
+  const hasTimeseriesData = timeseriesChartData.some(
+    (item) => item.total_runs > 0,
+  );
   const distributionChartData = distribution?.items ?? [];
-  const hasDistributionData = distributionChartData.some((item) => item.count > 0);
+  const hasDistributionData = distributionChartData.some(
+    (item) => item.count > 0,
+  );
   const toolChartData = (tools?.items ?? []).slice(0, 5).map((tool) => ({
     ...tool,
     label:
-      tool.name.length > 18 ? `${tool.name.slice(0, 18).trimEnd()}…` : tool.name,
+      tool.name.length > 18
+        ? `${tool.name.slice(0, 18).trimEnd()}…`
+        : tool.name,
     share_percent: Number((tool.share * 100).toFixed(1)),
   }));
   const hasToolData = toolChartData.length > 0;
@@ -259,7 +279,11 @@ export default function AnalyticsPage() {
           </p>
         </div>
 
-        <div className="analytics-toolbar__actions" role="group" aria-label="Analytics window">
+        <div
+          className="analytics-toolbar__actions"
+          role="group"
+          aria-label="Analytics window"
+        >
           {ANALYTICS_WINDOWS.map((windowValue) => (
             <button
               key={windowValue}
@@ -282,15 +306,21 @@ export default function AnalyticsPage() {
       <section className="history-overview analytics-overview">
         <article className="overview-card">
           <p className="overview-card__label">Average score</p>
-          <p className="overview-card__value">{formatScore(summary?.average_score ?? null)}</p>
+          <p className="overview-card__value">
+            {formatScore(summary?.average_score ?? null)}
+          </p>
         </article>
         <article className="overview-card">
           <p className="overview-card__label">Failure rate</p>
-          <p className="overview-card__value">{formatRate(summary?.failure_rate ?? null)}</p>
+          <p className="overview-card__value">
+            {formatRate(summary?.failure_rate ?? null)}
+          </p>
         </article>
         <article className="overview-card">
           <p className="overview-card__label">Average time</p>
-          <p className="overview-card__value">{formatDuration(summary?.average_duration_ms ?? null)}</p>
+          <p className="overview-card__value">
+            {formatDuration(summary?.average_duration_ms ?? null)}
+          </p>
         </article>
         <article className="overview-card">
           <p className="overview-card__label">Total runs</p>
@@ -320,16 +350,27 @@ export default function AnalyticsPage() {
                   <p className="section-card__eyebrow">Score over time</p>
                   <h3 className="section-card__title">Trend</h3>
                 </div>
-                <p className="section-card__meta">{timeseries?.items.length ?? 0} points</p>
+                <p className="section-card__meta">
+                  {timeseries?.items.length ?? 0} points
+                </p>
               </div>
               {isLoading ? (
-                <div className="analytics-placeholder">Loading trend data...</div>
+                <div className="analytics-placeholder">
+                  Loading trend data...
+                </div>
               ) : hasTimeseriesData ? (
                 <div className="analytics-chart">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={timeseriesChartData}>
-                      <CartesianGrid stroke="rgba(148, 163, 184, 0.12)" vertical={false} />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                      <CartesianGrid
+                        stroke="rgba(148, 163, 184, 0.12)"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                      />
                       <YAxis
                         yAxisId="score"
                         domain={[0, 10]}
@@ -381,7 +422,9 @@ export default function AnalyticsPage() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="analytics-placeholder">No completed runs in the selected window.</div>
+                <div className="analytics-placeholder">
+                  No completed runs in the selected window.
+                </div>
               )}
             </article>
 
@@ -394,16 +437,35 @@ export default function AnalyticsPage() {
                 <p className="section-card__meta">Three score bands</p>
               </div>
               {isLoading ? (
-                <div className="analytics-placeholder">Loading score distribution...</div>
+                <div className="analytics-placeholder">
+                  Loading score distribution...
+                </div>
               ) : hasDistributionData ? (
                 <div className="analytics-chart analytics-chart--compact">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={distributionChartData}>
-                      <CartesianGrid stroke="rgba(148, 163, 184, 0.12)" vertical={false} />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} />
-                      <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={30} />
+                      <CartesianGrid
+                        stroke="rgba(148, 163, 184, 0.12)"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        allowDecimals={false}
+                        tickLine={false}
+                        axisLine={false}
+                        width={30}
+                      />
                       <Tooltip
-                        formatter={(value) => formatTooltipValue(typeof value === 'number' ? value : null, 'Runs')}
+                        formatter={(value) =>
+                          formatTooltipValue(
+                            typeof value === 'number' ? value : null,
+                            'Runs',
+                          )
+                        }
                         contentStyle={{
                           borderRadius: '18px',
                           border: '1px solid rgba(148, 163, 184, 0.18)',
@@ -422,7 +484,9 @@ export default function AnalyticsPage() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="analytics-placeholder">No score distribution yet.</div>
+                <div className="analytics-placeholder">
+                  No score distribution yet.
+                </div>
               )}
             </article>
 
@@ -435,13 +499,27 @@ export default function AnalyticsPage() {
                 <p className="section-card__meta">Calls and run share</p>
               </div>
               {isLoading ? (
-                <div className="analytics-placeholder">Loading tool usage...</div>
+                <div className="analytics-placeholder">
+                  Loading tool usage...
+                </div>
               ) : hasToolData ? (
                 <div className="analytics-chart analytics-chart--compact">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={toolChartData} layout="vertical" margin={{ left: 12 }}>
-                      <CartesianGrid stroke="rgba(148, 163, 184, 0.12)" horizontal={false} />
-                      <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} />
+                    <BarChart
+                      data={toolChartData}
+                      layout="vertical"
+                      margin={{ left: 12 }}
+                    >
+                      <CartesianGrid
+                        stroke="rgba(148, 163, 184, 0.12)"
+                        horizontal={false}
+                      />
+                      <XAxis
+                        type="number"
+                        allowDecimals={false}
+                        tickLine={false}
+                        axisLine={false}
+                      />
                       <YAxis
                         type="category"
                         dataKey="label"
@@ -457,7 +535,9 @@ export default function AnalyticsPage() {
                           )
                         }
                         labelFormatter={(value, payload) => {
-                          const item = payload?.[0]?.payload as { name?: string } | undefined;
+                          const item = payload?.[0]?.payload as
+                            | { name?: string }
+                            | undefined;
                           return item?.name ?? String(value);
                         }}
                         contentStyle={{
@@ -476,12 +556,17 @@ export default function AnalyticsPage() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="analytics-placeholder">No tool calls recorded in this window.</div>
+                <div className="analytics-placeholder">
+                  No tool calls recorded in this window.
+                </div>
               )}
               {hasToolData ? (
                 <div className="analytics-list analytics-list--metrics">
                   {toolChartData.map((tool) => (
-                    <div key={tool.name} className="analytics-list__item analytics-list__item--stacked">
+                    <div
+                      key={tool.name}
+                      className="analytics-list__item analytics-list__item--stacked"
+                    >
                       <span>{tool.name}</span>
                       <strong>{tool.share_percent}%</strong>
                     </div>
@@ -496,22 +581,47 @@ export default function AnalyticsPage() {
                   <p className="section-card__eyebrow">Latency</p>
                   <h3 className="section-card__title">Tail performance</h3>
                 </div>
-                <p className="section-card__meta">P95 {formatCompactDuration(summary?.p95_duration_ms)}</p>
+                <p className="section-card__meta">
+                  P95 {formatCompactDuration(summary?.p95_duration_ms)}
+                </p>
               </div>
               {isLoading ? (
-                <div className="analytics-placeholder">Loading latency trend...</div>
+                <div className="analytics-placeholder">
+                  Loading latency trend...
+                </div>
               ) : hasTimeseriesData ? (
                 <div className="analytics-chart analytics-chart--compact">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={timeseriesChartData}>
                       <defs>
-                        <linearGradient id="analyticsLatencyFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#38bdf8" stopOpacity={0.35} />
-                          <stop offset="100%" stopColor="#38bdf8" stopOpacity={0.03} />
+                        <linearGradient
+                          id="analyticsLatencyFill"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="0%"
+                            stopColor="#38bdf8"
+                            stopOpacity={0.35}
+                          />
+                          <stop
+                            offset="100%"
+                            stopColor="#38bdf8"
+                            stopOpacity={0.03}
+                          />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid stroke="rgba(148, 163, 184, 0.12)" vertical={false} />
-                      <XAxis dataKey="label" tickLine={false} axisLine={false} />
+                      <CartesianGrid
+                        stroke="rgba(148, 163, 184, 0.12)"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                      />
                       <YAxis tickLine={false} axisLine={false} width={44} />
                       <Tooltip
                         formatter={(value) =>
@@ -539,7 +649,9 @@ export default function AnalyticsPage() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="analytics-placeholder">No latency data in the selected window.</div>
+                <div className="analytics-placeholder">
+                  No latency data in the selected window.
+                </div>
               )}
             </article>
           </div>

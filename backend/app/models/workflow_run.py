@@ -49,4 +49,3 @@ class WorkflowRunModel(Base):
         DateTime(timezone=True),
         index=True,
     )
-

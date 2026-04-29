@@ -97,9 +97,12 @@ export const getAnalyticsDistribution = async (days = 7) => {
 };
 
 export const getAnalyticsTools = async (days = 7) => {
-  const response = await apiClient.get<AnalyticsToolUsageList>('/analytics/tools', {
-    params: { days },
-  });
+  const response = await apiClient.get<AnalyticsToolUsageList>(
+    '/analytics/tools',
+    {
+      params: { days },
+    },
+  );
 
   return response.data;
 };

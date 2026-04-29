@@ -324,7 +324,13 @@ class WorkflowRunRepository:
             ).all()
 
         indexed_rows: dict[str, AnalyticsTimeSeriesPoint] = {}
-        for day_value, total_runs, average_score, average_duration_ms, failure_count in rows:
+        for (
+            day_value,
+            total_runs,
+            average_score,
+            average_duration_ms,
+            failure_count,
+        ) in rows:
             date_key = day_value.date().isoformat()
             total_runs = int(total_runs or 0)
             failure_count = int(failure_count or 0)
@@ -443,7 +449,9 @@ class WorkflowRunRepository:
                 name=name,
                 call_count=stats["call_count"],
                 run_count=len(stats["run_ids"]),
-                share=(round(stats["call_count"] / total_calls, 4) if total_calls else 0.0),
+                share=(
+                    round(stats["call_count"] / total_calls, 4) if total_calls else 0.0
+                ),
                 average_duration_ms=(
                     round(stats["duration_total"] / stats["duration_count"], 2)
                     if stats["duration_count"]

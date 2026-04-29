@@ -75,6 +75,48 @@ export type WorkflowRunStats = {
   last_run_at: string | null;
 };
 
+export type AnalyticsSummary = {
+  total_runs: number;
+  average_score: number | null;
+  failure_rate: number | null;
+  average_duration_ms: number | null;
+  p95_duration_ms: number | null;
+};
+
+export type AnalyticsTimeSeriesPoint = {
+  date: string;
+  total_runs: number;
+  average_score: number | null;
+  failure_rate: number | null;
+  average_duration_ms: number | null;
+};
+
+export type AnalyticsTimeSeries = {
+  items: AnalyticsTimeSeriesPoint[];
+};
+
+export type AnalyticsDistributionBucket = {
+  key: string;
+  label: string;
+  count: number;
+};
+
+export type AnalyticsDistribution = {
+  items: AnalyticsDistributionBucket[];
+};
+
+export type AnalyticsToolUsage = {
+  name: string;
+  call_count: number;
+  run_count: number;
+  share: number;
+  average_duration_ms: number | null;
+};
+
+export type AnalyticsToolUsageList = {
+  items: AnalyticsToolUsage[];
+};
+
 export type WorkflowMessage =
   | { event: 'status'; data: string }
   | { event: 'plan'; data: PlanStep[] }

@@ -1,6 +1,10 @@
 import axios from 'axios';
 
 import type {
+  AnalyticsDistribution,
+  AnalyticsSummary,
+  AnalyticsTimeSeries,
+  AnalyticsToolUsageList,
   WorkflowEventName,
   WorkflowMessage,
   WorkflowRunEnvelope,
@@ -59,5 +63,43 @@ export const getRun = async (runId: string) => {
 
 export const getRunStats = async () => {
   const response = await apiClient.get<WorkflowRunStats>('/runs/stats');
+  return response.data;
+};
+
+export const getAnalyticsSummary = async (days = 7) => {
+  const response = await apiClient.get<AnalyticsSummary>('/analytics/summary', {
+    params: { days },
+  });
+
+  return response.data;
+};
+
+export const getAnalyticsTimeseries = async (days = 7) => {
+  const response = await apiClient.get<AnalyticsTimeSeries>(
+    '/analytics/timeseries',
+    {
+      params: { days },
+    },
+  );
+
+  return response.data;
+};
+
+export const getAnalyticsDistribution = async (days = 7) => {
+  const response = await apiClient.get<AnalyticsDistribution>(
+    '/analytics/distribution',
+    {
+      params: { days },
+    },
+  );
+
+  return response.data;
+};
+
+export const getAnalyticsTools = async (days = 7) => {
+  const response = await apiClient.get<AnalyticsToolUsageList>('/analytics/tools', {
+    params: { days },
+  });
+
   return response.data;
 };

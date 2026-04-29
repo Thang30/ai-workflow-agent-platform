@@ -75,6 +75,26 @@ def workflow_runs(
     return orchestrator.list_runs(page=page, page_size=page_size)
 
 
+@app.get("/analytics/summary")
+def analytics_summary(days: int = Query(default=7, ge=1, le=90)):
+    return orchestrator.get_analytics_summary(days=days)
+
+
+@app.get("/analytics/timeseries")
+def analytics_timeseries(days: int = Query(default=7, ge=1, le=90)):
+    return orchestrator.get_analytics_timeseries(days=days)
+
+
+@app.get("/analytics/distribution")
+def analytics_distribution(days: int = Query(default=7, ge=1, le=90)):
+    return orchestrator.get_analytics_distribution(days=days)
+
+
+@app.get("/analytics/tools")
+def analytics_tools(days: int = Query(default=7, ge=1, le=90)):
+    return orchestrator.get_analytics_tools(days=days)
+
+
 @app.get("/runs/{run_id}")
 def workflow_run(run_id: UUID):
     result = orchestrator.get_run(str(run_id))

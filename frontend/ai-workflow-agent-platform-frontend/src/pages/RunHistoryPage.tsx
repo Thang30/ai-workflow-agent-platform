@@ -5,6 +5,7 @@ import FinalAnswer from '../components/FinalAnswer';
 import PlanView from '../components/PlanView';
 import TraceView from '../components/TraceView';
 import type {
+  WorkflowAttempt,
   WorkflowRunEnvelope,
   WorkflowRunStats,
   WorkflowRunSummary,
@@ -70,6 +71,9 @@ const buildHistorySteps = (traces: WorkflowTrace[]): WorkflowStep[] => {
 export default function RunHistoryPage() {
   const [runs, setRuns] = useState<WorkflowRunSummary[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedAttemptNumber, setSelectedAttemptNumber] = useState<
+    number | null
+  >(null);
   const [selectedRun, setSelectedRun] = useState<WorkflowRunEnvelope | null>(
     null,
   );
@@ -83,9 +87,15 @@ export default function RunHistoryPage() {
     try {
       const data = await getRun(runId);
       setSelectedRun(data);
+      setSelectedAttemptNumber(
+        data.workflow_run?.selected_attempt_number ??
+          data.attempts.at(-1)?.attempt_number ??
+          null,
+      );
       setDetailError('');
     } catch {
       setSelectedRun(null);
+      setSelectedAttemptNumber(null);
       setDetailError('Unable to load the selected workflow run.');
     } finally {
       setIsDetailLoading(false);
@@ -111,6 +121,7 @@ export default function RunHistoryPage() {
 
         if (!nextSelectedRunId) {
           setSelectedRun(null);
+          setSelectedAttemptNumber(null);
           setDetailError('');
           setIsDetailLoading(false);
 
@@ -135,6 +146,7 @@ export default function RunHistoryPage() {
         setRuns([]);
         setStats(null);
         setSelectedRun(null);
+        setSelectedAttemptNumber(null);
         setDetailError('');
         setIsDetailLoading(false);
         setListError('Unable to load workflow history right now.');
@@ -185,7 +197,22 @@ export default function RunHistoryPage() {
 
   const selectedSummary = runs.find((run) => run.id === selectedRunId) ?? null;
   const detailRun = selectedRun?.workflow_run;
-  const historySteps = selectedRun ? buildHistorySteps(selectedRun.traces) : [];
+  const attempts = selectedRun?.attempts ?? [];
+  const selectedAttempt: WorkflowAttempt | null =
+    attempts.find(
+      (attempt) => attempt.attempt_number === selectedAttemptNumber,
+    ) ??
+    (detailRun?.selected_attempt_number
+      ? attempts.find(
+          (attempt) =>
+            attempt.attempt_number === detailRun.selected_attempt_number,
+        )
+      : null) ??
+    attempts.at(-1) ??
+    null;
+  const selectedPlan = selectedAttempt?.plan ?? selectedRun?.plan ?? [];
+  const selectedTraces = selectedAttempt?.traces ?? selectedRun?.traces ?? [];
+  const historySteps = buildHistorySteps(selectedTraces);
 
   return (
     <>
@@ -272,7 +299,8 @@ export default function RunHistoryPage() {
 
                   <p className="history-list__meta">
                     {formatDateTime(run.created_at)} ·{' '}
-                    {formatDuration(run.duration_ms)}
+                    {formatDuration(run.duration_ms)} · {run.attempt_count}{' '}
+                    {run.attempt_count === 1 ? 'attempt' : 'attempts'}
                   </p>
 
                   <p className="history-list__preview">
@@ -333,6 +361,13 @@ export default function RunHistoryPage() {
                 </article>
 
                 <article className="run-meta-card">
+                  <p className="run-meta-card__label">Attempts</p>
+                  <p className="run-meta-card__value">
+                    {detailRun.attempt_count}
+                  </p>
+                </article>
+
+                <article className="run-meta-card">
                   <p className="run-meta-card__label">Run ID</p>
                   <p className="run-meta-card__value run-meta-card__value--mono">
                     {detailRun.id}
@@ -340,9 +375,36 @@ export default function RunHistoryPage() {
                 </article>
               </section>
 
+              {attempts.length > 0 ? (
+                <section className="history-overview">
+                  {attempts.map((attempt) => (
+                    <button
+                      key={attempt.id}
+                      type="button"
+                      className={`history-refresh${attempt.attempt_number === selectedAttemptNumber ? ' analytics-filter analytics-filter--active' : ' analytics-filter'}`}
+                      onClick={() => {
+                        setSelectedAttemptNumber(attempt.attempt_number);
+                      }}
+                    >
+                      Attempt {attempt.attempt_number}
+                      {attempt.evaluation_score !== null &&
+                      attempt.evaluation_score !== undefined
+                        ? ` · ${attempt.evaluation_score}/10`
+                        : attempt.status === 'failed'
+                          ? ' · failed'
+                          : ''}
+                      {detailRun.selected_attempt_number ===
+                      attempt.attempt_number
+                        ? ' · selected'
+                        : ''}
+                    </button>
+                  ))}
+                </section>
+              ) : null}
+
               <div className="history-detail-stack">
                 <PlanView
-                  plan={selectedRun.plan}
+                  plan={selectedPlan}
                   steps={historySteps}
                   emptyMessage="This run failed before a plan was saved."
                 />
@@ -352,6 +414,8 @@ export default function RunHistoryPage() {
                 />
                 <FinalAnswer
                   workflowRun={detailRun}
+                  selectedAttempt={selectedAttempt}
+                  attempts={attempts}
                   status={formatStatus(detailRun.status)}
                 />
               </div>

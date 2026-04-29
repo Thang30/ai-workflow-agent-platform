@@ -36,14 +36,13 @@ class PlannerAgent:
 
         raise ValueError("No valid JSON step list found in model response")
 
-    def run(self, query: str):
+    def run(self, query: str, improvement_hint: str | None = None):
         """
         Generates a step-by-step plan from user query.
         Returns a list of steps.
         """
 
-        prompt = (
-            """
+        prompt = """
 You are a planning agent.
 
 Break the user's request into clear steps.
@@ -62,10 +61,14 @@ Example:
 ]
 
 User request:
-"""
-            + query
-            + "\n"
-        )
+""" + query + "\n"
+
+        if improvement_hint:
+            prompt += (
+                "\nAdditional retry guidance from the previous attempt:\n"
+                f"{improvement_hint}\n"
+                "Revise the plan to directly address these issues.\n"
+            )
 
         response = self.llm.chat(prompt)
 

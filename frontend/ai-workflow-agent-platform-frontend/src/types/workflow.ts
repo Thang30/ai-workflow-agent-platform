@@ -3,6 +3,8 @@ export type ToolCall = {
   query: string;
   preview: string;
   raw_output?: unknown;
+  success?: boolean;
+  error_message?: string | null;
   started_at?: string;
   finished_at?: string;
   duration_ms?: number;
@@ -34,6 +36,8 @@ export type WorkflowRun = {
   query: string;
   status: WorkflowStatus;
   created_at: string;
+  attempt_count: number;
+  selected_attempt_number: number | null;
   final_answer: string | null;
   evaluation_score: number | null;
   evaluation_reason: string | null;
@@ -42,12 +46,32 @@ export type WorkflowRun = {
   error_message: string | null;
 };
 
+export type WorkflowAttempt = {
+  id: string;
+  run_id: string;
+  attempt_number: number;
+  status: WorkflowStatus;
+  created_at: string;
+  retry_trigger: string | null;
+  improvement_hint: string | null;
+  had_tool_failure: boolean;
+  final_answer: string | null;
+  evaluation_score: number | null;
+  evaluation_reason: string | null;
+  duration_ms: number | null;
+  completed_at: string | null;
+  error_message: string | null;
+  plan: PlanStep[];
+  traces: WorkflowTrace[];
+};
+
 export type WorkflowRunEnvelope = {
   input: string;
   plan: PlanStep[];
   traces: WorkflowTrace[];
   final: string | null;
   workflow_run: WorkflowRun | null;
+  attempts: WorkflowAttempt[];
 };
 
 export type WorkflowRunSummary = {
@@ -55,6 +79,8 @@ export type WorkflowRunSummary = {
   query: string;
   status: WorkflowStatus;
   created_at: string;
+  attempt_count: number;
+  selected_attempt_number: number | null;
   final_answer: string | null;
   evaluation_score: number | null;
   duration_ms: number | null;
@@ -81,6 +107,10 @@ export type AnalyticsSummary = {
   failure_rate: number | null;
   average_duration_ms: number | null;
   p95_duration_ms: number | null;
+  retry_rate: number | null;
+  successful_retry_rate: number | null;
+  average_attempts_per_run: number | null;
+  average_score_improvement: number | null;
 };
 
 export type AnalyticsTimeSeriesPoint = {
@@ -89,6 +119,9 @@ export type AnalyticsTimeSeriesPoint = {
   average_score: number | null;
   failure_rate: number | null;
   average_duration_ms: number | null;
+  retry_rate: number | null;
+  average_attempts_per_run: number | null;
+  average_score_improvement: number | null;
 };
 
 export type AnalyticsTimeSeries = {
@@ -119,12 +152,29 @@ export type AnalyticsToolUsageList = {
 
 export type WorkflowMessage =
   | { event: 'status'; data: string }
-  | { event: 'plan'; data: PlanStep[] }
-  | { event: 'step_start'; data: PlanStep }
+  | {
+      event: 'attempt_start';
+      data: {
+        attempt_number: number;
+        retry_trigger: string | null;
+        improvement_hint: string | null;
+      };
+    }
+  | { event: 'attempt_complete'; data: WorkflowAttempt }
+  | { event: 'plan'; data: { attempt_number: number; plan: PlanStep[] } }
+  | {
+      event: 'step_start';
+      data: { attempt_number: number; step: number; description: string };
+    }
   | {
       event: 'step_done';
-      data: { step: number; output: string; tools?: ToolCall[] };
+      data: {
+        attempt_number: number;
+        step: number;
+        output: string;
+        tools?: ToolCall[];
+      };
     }
-  | { event: 'final'; data: WorkflowRun };
+  | { event: 'final'; data: WorkflowRunEnvelope };
 
 export type WorkflowEventName = WorkflowMessage['event'];

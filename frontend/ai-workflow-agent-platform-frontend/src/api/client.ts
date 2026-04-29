@@ -29,6 +29,8 @@ export const streamWorkflow = (query: string, handlers: StreamHandlers) => {
 
   const events: WorkflowEventName[] = [
     'status',
+    'attempt_start',
+    'attempt_complete',
     'plan',
     'step_start',
     'step_done',

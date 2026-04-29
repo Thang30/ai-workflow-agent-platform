@@ -22,6 +22,8 @@ class WorkflowRun:
     query: str
     status: str
     created_at: str
+    attempt_count: int = 0
+    selected_attempt_number: int | None = None
     final_answer: str | None = None
     evaluation_score: int | None = None
     evaluation_reason: str | None = None
@@ -34,11 +36,36 @@ class WorkflowRun:
 
 
 @dataclass(slots=True)
+class WorkflowAttempt:
+    id: str
+    run_id: str
+    attempt_number: int
+    status: str
+    created_at: str
+    retry_trigger: str | None = None
+    improvement_hint: str | None = None
+    had_tool_failure: bool = False
+    final_answer: str | None = None
+    evaluation_score: int | None = None
+    evaluation_reason: str | None = None
+    duration_ms: int | None = None
+    completed_at: str | None = None
+    error_message: str | None = None
+    plan: list[dict[str, Any]] = field(default_factory=list)
+    traces: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
 class WorkflowRunSummary:
     id: str
     query: str
     status: str
     created_at: str
+    attempt_count: int = 0
+    selected_attempt_number: int | None = None
     final_answer: str | None = None
     evaluation_score: int | None = None
     duration_ms: int | None = None
@@ -56,6 +83,7 @@ class WorkflowRunEnvelope:
     traces: list[dict[str, Any]] = field(default_factory=list)
     final: str | None = None
     workflow_run: WorkflowRun | None = None
+    attempts: list[WorkflowAttempt] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -64,6 +92,7 @@ class WorkflowRunEnvelope:
             "traces": self.traces,
             "final": self.final,
             "workflow_run": self.workflow_run.to_dict() if self.workflow_run else None,
+            "attempts": [attempt.to_dict() for attempt in self.attempts],
         }
 
 
@@ -100,6 +129,10 @@ class AnalyticsSummary:
     failure_rate: float | None
     average_duration_ms: float | None
     p95_duration_ms: int | None
+    retry_rate: float | None = None
+    successful_retry_rate: float | None = None
+    average_attempts_per_run: float | None = None
+    average_score_improvement: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -112,6 +145,9 @@ class AnalyticsTimeSeriesPoint:
     average_score: float | None
     failure_rate: float | None
     average_duration_ms: float | None
+    retry_rate: float | None = None
+    average_attempts_per_run: float | None = None
+    average_score_improvement: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

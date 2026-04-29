@@ -59,6 +59,22 @@ const formatRate = (value: number | null) => {
   return `${Math.round(value * 100)}%`;
 };
 
+const formatAttempts = (value: number | null) => {
+  if (value === null) {
+    return 'No completed runs';
+  }
+
+  return value.toFixed(2);
+};
+
+const formatImprovement = (value: number | null) => {
+  if (value === null) {
+    return 'No scored retries';
+  }
+
+  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
+};
+
 const formatDuration = (value: number | null) => {
   if (value === null) {
     return 'No completed runs';
@@ -118,6 +134,14 @@ const formatTooltipValue = (
     return [`${value.toFixed(1)}%`, label];
   }
 
+  if (label === 'Retry rate') {
+    return [`${value.toFixed(1)}%`, label];
+  }
+
+  if (label === 'Avg improvement') {
+    return [`${value >= 0 ? '+' : ''}${value.toFixed(2)}`, label];
+  }
+
   return [value, label];
 };
 
@@ -148,6 +172,33 @@ const buildInsights = (
     } else if (summary.failure_rate <= 0.1) {
       insights.push(
         'Failure rate is low in this window, which suggests the workflow is operating steadily.',
+      );
+    }
+  }
+
+  if (summary?.retry_rate !== null && summary?.retry_rate !== undefined) {
+    if (summary.retry_rate >= 0.3) {
+      insights.push(
+        'Retry rate is elevated, which means the self-improvement loop is active frequently in this window.',
+      );
+    } else if (summary.retry_rate > 0) {
+      insights.push(
+        'Retries are being used selectively rather than on every run, which keeps latency bounded.',
+      );
+    }
+  }
+
+  if (
+    summary?.average_score_improvement !== null &&
+    summary?.average_score_improvement !== undefined
+  ) {
+    if (summary.average_score_improvement > 0) {
+      insights.push(
+        `Retried runs improved by ${summary.average_score_improvement.toFixed(2)} points on average.`,
+      );
+    } else if (summary.average_score_improvement < 0) {
+      insights.push(
+        'Retries are not improving score quality on average in this window.',
       );
     }
   }
@@ -237,9 +288,18 @@ export default function AnalyticsPage() {
       item.failure_rate === null
         ? null
         : Number((item.failure_rate * 100).toFixed(1)),
+    retry_rate_percent:
+      item.retry_rate === null
+        ? null
+        : Number((item.retry_rate * 100).toFixed(1)),
   }));
   const hasTimeseriesData = timeseriesChartData.some(
     (item) => item.total_runs > 0,
+  );
+  const hasRetryTimeseriesData = timeseriesChartData.some(
+    (item) =>
+      item.retry_rate_percent !== null ||
+      item.average_score_improvement !== null,
   );
   const distributionChartData = distribution?.items ?? [];
   const hasDistributionData = distributionChartData.some(
@@ -325,6 +385,30 @@ export default function AnalyticsPage() {
         <article className="overview-card">
           <p className="overview-card__label">Total runs</p>
           <p className="overview-card__value">{summary?.total_runs ?? 0}</p>
+        </article>
+        <article className="overview-card">
+          <p className="overview-card__label">Retry rate</p>
+          <p className="overview-card__value">
+            {formatRate(summary?.retry_rate ?? null)}
+          </p>
+        </article>
+        <article className="overview-card">
+          <p className="overview-card__label">Retry success</p>
+          <p className="overview-card__value">
+            {formatRate(summary?.successful_retry_rate ?? null)}
+          </p>
+        </article>
+        <article className="overview-card">
+          <p className="overview-card__label">Avg attempts</p>
+          <p className="overview-card__value">
+            {formatAttempts(summary?.average_attempts_per_run ?? null)}
+          </p>
+        </article>
+        <article className="overview-card">
+          <p className="overview-card__label">Avg improvement</p>
+          <p className="overview-card__value">
+            {formatImprovement(summary?.average_score_improvement ?? null)}
+          </p>
         </article>
       </section>
 
@@ -424,6 +508,90 @@ export default function AnalyticsPage() {
               ) : (
                 <div className="analytics-placeholder">
                   No completed runs in the selected window.
+                </div>
+              )}
+            </article>
+
+            <article className="section-card analytics-card">
+              <div className="section-card__header">
+                <div>
+                  <p className="section-card__eyebrow">Retry loop</p>
+                  <h3 className="section-card__title">Self-improvement</h3>
+                </div>
+                <p className="section-card__meta">
+                  {formatRate(summary?.retry_rate ?? null)} retry rate
+                </p>
+              </div>
+              {isLoading ? (
+                <div className="analytics-placeholder">
+                  Loading retry metrics...
+                </div>
+              ) : hasRetryTimeseriesData ? (
+                <div className="analytics-chart analytics-chart--compact">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={timeseriesChartData}>
+                      <CartesianGrid
+                        stroke="rgba(148, 163, 184, 0.12)"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="label"
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        yAxisId="rate"
+                        domain={[0, 100]}
+                        tickLine={false}
+                        axisLine={false}
+                        width={40}
+                      />
+                      <YAxis
+                        yAxisId="delta"
+                        orientation="right"
+                        tickLine={false}
+                        axisLine={false}
+                        width={44}
+                      />
+                      <Tooltip
+                        formatter={(value, name) =>
+                          formatTooltipValue(
+                            typeof value === 'number' ? value : null,
+                            name === 'retry_rate_percent'
+                              ? 'Retry rate'
+                              : 'Avg improvement',
+                          )
+                        }
+                        labelFormatter={(value) => `Day: ${value}`}
+                        contentStyle={{
+                          borderRadius: '18px',
+                          border: '1px solid rgba(148, 163, 184, 0.18)',
+                          background: 'rgba(8, 15, 27, 0.96)',
+                        }}
+                      />
+                      <Legend />
+                      <Bar
+                        yAxisId="delta"
+                        dataKey="average_score_improvement"
+                        name="Avg improvement"
+                        fill="#f59e0b"
+                        radius={[10, 10, 4, 4]}
+                      />
+                      <Line
+                        yAxisId="rate"
+                        type="monotone"
+                        dataKey="retry_rate_percent"
+                        name="Retry rate"
+                        stroke="#34d399"
+                        strokeWidth={3}
+                        dot={false}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="analytics-placeholder">
+                  No retry activity in the selected window.
                 </div>
               )}
             </article>

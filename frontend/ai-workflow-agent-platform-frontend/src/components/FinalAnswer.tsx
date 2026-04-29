@@ -1,9 +1,11 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { WorkflowRun } from '../types/workflow';
+import type { WorkflowAttempt, WorkflowRun } from '../types/workflow';
 
 type FinalAnswerProps = {
   workflowRun: WorkflowRun | null;
+  selectedAttempt?: WorkflowAttempt | null;
+  attempts?: WorkflowAttempt[];
   status: string;
 };
 
@@ -23,17 +25,44 @@ const getScoreTone = (score: number | null | undefined) => {
   return ' answer-evaluation--weak';
 };
 
-export default function FinalAnswer({ workflowRun, status }: FinalAnswerProps) {
-  const answer = workflowRun?.final_answer ?? '';
-  const isFailed = workflowRun?.status === 'failed';
+export default function FinalAnswer({
+  workflowRun,
+  selectedAttempt,
+  attempts = [],
+  status,
+}: FinalAnswerProps) {
+  const result = selectedAttempt ?? workflowRun;
+  const answer = result?.final_answer ?? '';
+  const isFailed = result?.status === 'failed';
   const showEvaluation =
-    workflowRun?.evaluation_score !== null &&
-    workflowRun?.evaluation_score !== undefined &&
-    workflowRun?.evaluation_reason;
+    result?.evaluation_score !== null &&
+    result?.evaluation_score !== undefined &&
+    result?.evaluation_reason;
+  const selectedAttemptNumber =
+    selectedAttempt?.attempt_number ??
+    workflowRun?.selected_attempt_number ??
+    null;
+  const totalAttempts = attempts.length || workflowRun?.attempt_count || 0;
+  const attemptSummary = attempts
+    .map((attempt) => {
+      const scoreLabel =
+        attempt.evaluation_score === null ||
+        attempt.evaluation_score === undefined
+          ? attempt.status === 'failed'
+            ? 'failed'
+            : 'unscored'
+          : `${attempt.evaluation_score}/10`;
+      const selectedLabel =
+        workflowRun?.selected_attempt_number === attempt.attempt_number
+          ? ' selected'
+          : '';
+      return `Attempt ${attempt.attempt_number}: ${scoreLabel}${selectedLabel}`;
+    })
+    .join(' · ');
 
   const pillClassName = isFailed
     ? ' answer-pill--failed'
-    : workflowRun?.status === 'running'
+    : result?.status === 'running'
       ? ' answer-pill--running'
       : answer
         ? ' answer-pill--ready'
@@ -43,7 +72,7 @@ export default function FinalAnswer({ workflowRun, status }: FinalAnswerProps) {
     ? 'Failed'
     : answer
       ? 'Reviewed'
-      : workflowRun?.status === 'running'
+      : result?.status === 'running'
         ? 'Running'
         : status || 'Waiting';
 
@@ -53,36 +82,59 @@ export default function FinalAnswer({ workflowRun, status }: FinalAnswerProps) {
         <div>
           <p className="section-card__eyebrow">Reviewer</p>
           <h3 className="section-card__title">Final answer</h3>
+          {selectedAttemptNumber ? (
+            <p className="panel-banner__copy">
+              Attempt {selectedAttemptNumber}
+              {totalAttempts > 0 ? ` of ${totalAttempts}` : ''}
+              {workflowRun?.selected_attempt_number === selectedAttemptNumber
+                ? ' · Selected best attempt'
+                : ''}
+            </p>
+          ) : null}
         </div>
 
         <span className={`answer-pill${pillClassName}`}>{pillLabel}</span>
       </div>
 
-      {workflowRun?.error_message ? (
+      {attemptSummary ? (
+        <div className="answer-alert">
+          <p className="answer-alert__label">Attempt scores</p>
+          <p className="answer-alert__copy">{attemptSummary}</p>
+        </div>
+      ) : null}
+
+      {selectedAttempt?.retry_trigger ? (
+        <div className="answer-alert">
+          <p className="answer-alert__label">Retry trigger</p>
+          <p className="answer-alert__copy">{selectedAttempt.retry_trigger}</p>
+        </div>
+      ) : null}
+
+      {result?.error_message ? (
         <div className="answer-alert">
           <p className="answer-alert__label">Workflow note</p>
-          <p className="answer-alert__copy">{workflowRun.error_message}</p>
+          <p className="answer-alert__copy">{result.error_message}</p>
         </div>
       ) : null}
 
       {answer ? (
         <>
-          {workflowRun && showEvaluation ? (
+          {result && showEvaluation ? (
             <div
-              className={`answer-evaluation${getScoreTone(workflowRun.evaluation_score)}`}
+              className={`answer-evaluation${getScoreTone(result.evaluation_score)}`}
             >
               <div className="answer-evaluation__score-block">
                 <p className="answer-evaluation__eyebrow">Evaluator</p>
                 <div className="answer-evaluation__score">
                   <span className="answer-evaluation__value">
-                    {workflowRun.evaluation_score}
+                    {result.evaluation_score}
                   </span>
                   <span className="answer-evaluation__max">/10</span>
                 </div>
               </div>
 
               <p className="answer-evaluation__reason">
-                {workflowRun.evaluation_reason}
+                {result.evaluation_reason}
               </p>
             </div>
           ) : null}

@@ -32,11 +32,15 @@ def _build_tool_response(
     finished_at: str,
     elapsed_seconds: float,
     preview: str,
+    success: bool,
+    error_message: str | None = None,
 ) -> dict[str, Any]:
     return {
         "query": query,
         "preview": preview,
         "raw_output": raw_output,
+        "success": success,
+        "error_message": error_message,
         "started_at": started_at,
         "finished_at": finished_at,
         "duration_ms": round(elapsed_seconds * 1000, 2),
@@ -45,6 +49,20 @@ def _build_tool_response(
 
 def web_search(query: str, structured: bool = False) -> str | dict[str, Any]:
     if not settings.tavily_api_key:
+        error_message = "Web search unavailable: TAVILY_API_KEY is not configured"
+        if structured:
+            now = _utc_now_iso()
+            return _build_tool_response(
+                query=_normalize_query(query),
+                raw_output={"error": "TAVILY_API_KEY is not configured"},
+                started_at=now,
+                finished_at=now,
+                elapsed_seconds=0,
+                preview=error_message,
+                success=False,
+                error_message="TAVILY_API_KEY is not configured",
+            )
+
         raise ValueError("TAVILY_API_KEY is not configured")
 
     normalized_query = _normalize_query(query)
@@ -59,6 +77,8 @@ def web_search(query: str, structured: bool = False) -> str | dict[str, Any]:
                 finished_at=now,
                 elapsed_seconds=0,
                 preview=empty_message,
+                success=False,
+                error_message="Empty query",
             )
 
         return empty_message
@@ -79,6 +99,8 @@ def web_search(query: str, structured: bool = False) -> str | dict[str, Any]:
                 finished_at=_utc_now_iso(),
                 elapsed_seconds=perf_counter() - started_at_monotonic,
                 preview=error_message,
+                success=False,
+                error_message=str(exc),
             )
 
         return error_message
@@ -94,6 +116,7 @@ def web_search(query: str, structured: bool = False) -> str | dict[str, Any]:
             finished_at=_utc_now_iso(),
             elapsed_seconds=perf_counter() - started_at_monotonic,
             preview=preview,
+            success=True,
         )
 
     return preview

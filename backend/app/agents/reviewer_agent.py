@@ -20,7 +20,7 @@ class ReviewerAgent:
         self,
         query: str,
         steps: list,
-        results: list,
+        results: str,
         improvement_hint: str | None = None,
     ) -> str:
         """
@@ -36,18 +36,16 @@ Retry guidance from the previous attempt:
 Address these issues directly in the final answer.
 """
 
-        prompt = (
-            render_prompt(
-                resolve_prompt(
-                    self.prompt_overrides,
-                    REVIEWER_PROMPT_KEY,
-                    DEFAULT_REVIEWER_PROMPT,
-                ),
-                query=query,
-                steps=str(steps),
-                results=str(results),
-                improvement_section=improvement_section,
+        prompt = render_prompt(
+            resolve_prompt(
+                self.prompt_overrides,
+                REVIEWER_PROMPT_KEY,
+                DEFAULT_REVIEWER_PROMPT,
             ),
+            query=query,
+            steps=str(steps),
+            results=results,
+            improvement_section=improvement_section,
         )
 
         return self.llm.chat(prompt)

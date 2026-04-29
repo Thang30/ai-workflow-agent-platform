@@ -2,6 +2,15 @@
 
 A multi-agent system that completes real workflows with visible reasoning, tools, and structure.
 
+## Tool execution
+
+The executor now selects between multiple tools at runtime instead of relying on a single hardcoded search path.
+
+- `web_search` is used for current events, external facts, and retrieval-heavy steps.
+- `calculator` is used for deterministic formulas, arithmetic, and numeric tasks.
+- `current_datetime` is used for current date and time context.
+- Tool choice happens inside the executor. The planner output remains step-oriented and tool-agnostic.
+
 ## Config-driven experiments
 
 The active A/B test is now configured in the backend `.env` instead of being created from the UI.

@@ -7,6 +7,7 @@ from app.agents.executor_agent import ExecutorAgent
 from app.agents.planner_agent import PlannerAgent
 from app.core.config import settings
 from app.core.orchestrator import WorkflowOrchestrator
+from app.tools.registry import DEFAULT_TOOL_REGISTRY
 
 from sse_starlette.sse import EventSourceResponse
 
@@ -23,7 +24,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-agent = ExecutorAgent()
+agent = ExecutorAgent(tools=DEFAULT_TOOL_REGISTRY)
 planner = PlannerAgent()
 orchestrator = WorkflowOrchestrator()
 

@@ -11,15 +11,16 @@ A multi-agent system that executes structured workflows using LLMs.
 - Output: list of steps (JSON)
 
 ### Executor
-- Executes each step using tools
-- Returns result
+- Chooses whether to answer directly or use a tool for each step
+- Available tools: web search, calculator, and current date/time
+- Returns step output plus structured tool metadata for traces and analytics
 
 ### Reviewer
 - Validates and improves final output
 
 ## Flow
 
-User Input → Planner → Executor (per step) → Reviewer → Final Output
+User Input → Planner → Executor (per step, with tool selection) → Reviewer → Final Output
 
 ## Tech Stack
 

@@ -96,8 +96,10 @@ export default function TraceView({ steps, emptyMessage }: TraceViewProps) {
                       className="tool-card"
                     >
                       <p className="tool-card__name">{tool.name}</p>
-                      <p className="tool-card__label">Query</p>
-                      <p className="tool-card__meta">{tool.query}</p>
+                      <p className="tool-card__label">Tool input</p>
+                      <pre className="tool-card__raw tool-card__input">
+                        {tool.input || tool.query}
+                      </pre>
 
                       {(tool.started_at ||
                         tool.finished_at ||

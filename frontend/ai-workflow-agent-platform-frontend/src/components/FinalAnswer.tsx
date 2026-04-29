@@ -78,7 +78,9 @@ export default function FinalAnswer({
   const reasoningSummary = result?.reasoning_summary ?? null;
   const toolGroups = selectedTraces.filter((trace) => trace.tools.length > 0);
   const hasExplainability =
-    Boolean(reasoningSummary) || selectedPlan.length > 0 || toolGroups.length > 0;
+    Boolean(reasoningSummary) ||
+    selectedPlan.length > 0 ||
+    toolGroups.length > 0;
   const selectedAttemptNumber =
     selectedAttempt?.attempt_number ??
     workflowRun?.selected_attempt_number ??

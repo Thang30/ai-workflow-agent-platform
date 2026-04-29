@@ -17,8 +17,17 @@ type FinalAnswerProps = {
   status: string;
 };
 
+type AnswerPillState = {
+  className: string;
+  label: string;
+};
+
+const hasScore = (score: number | null | undefined): score is number => {
+  return score !== null && score !== undefined;
+};
+
 const getScoreTone = (score: number | null | undefined) => {
-  if (score === null || score === undefined) {
+  if (!hasScore(score)) {
     return '';
   }
 
@@ -36,7 +45,7 @@ const getScoreTone = (score: number | null | undefined) => {
 const deriveConfidenceLevel = (
   score: number | null | undefined,
 ): ConfidenceLevel | null => {
-  if (score === null || score === undefined) {
+  if (!hasScore(score)) {
     return null;
   }
 
@@ -59,6 +68,59 @@ const getConfidenceLabel = (level: ConfidenceLevel | null) => {
   return `${level.slice(0, 1).toUpperCase()}${level.slice(1)}`;
 };
 
+const formatAttemptScoreLabel = (attempt: WorkflowAttempt) => {
+  if (hasScore(attempt.evaluation_score)) {
+    return `${attempt.evaluation_score}/10`;
+  }
+
+  return attempt.status === 'failed' ? 'failed' : 'unscored';
+};
+
+const buildAttemptSummary = (
+  attempts: WorkflowAttempt[],
+  selectedAttemptNumber: number | null,
+) => {
+  return attempts
+    .map((attempt) => {
+      const selectedLabel =
+        selectedAttemptNumber === attempt.attempt_number ? ' selected' : '';
+      return `Attempt ${attempt.attempt_number}: ${formatAttemptScoreLabel(attempt)}${selectedLabel}`;
+    })
+    .join(' · ');
+};
+
+const getAnswerPillState = (
+  result: WorkflowRun | WorkflowAttempt | null,
+  answer: string,
+  status: string,
+): AnswerPillState => {
+  if (result?.status === 'failed') {
+    return {
+      className: ' answer-pill--failed',
+      label: 'Failed',
+    };
+  }
+
+  if (result?.status === 'running') {
+    return {
+      className: ' answer-pill--running',
+      label: answer ? 'Reviewed' : 'Running',
+    };
+  }
+
+  if (answer) {
+    return {
+      className: ' answer-pill--ready',
+      label: 'Reviewed',
+    };
+  }
+
+  return {
+    className: '',
+    label: status || 'Waiting',
+  };
+};
+
 export default function FinalAnswer({
   workflowRun,
   selectedAttempt,
@@ -70,8 +132,7 @@ export default function FinalAnswer({
   const result = selectedAttempt ?? workflowRun;
   const answer = result?.final_answer ?? '';
   const isFailed = result?.status === 'failed';
-  const showEvaluation =
-    result?.evaluation_score !== null && result?.evaluation_score !== undefined;
+  const showEvaluation = hasScore(result?.evaluation_score);
   const confidenceLevel =
     result?.confidence_level ?? deriveConfidenceLevel(result?.evaluation_score);
   const confidenceLabel = getConfidenceLabel(confidenceLevel);
@@ -86,38 +147,11 @@ export default function FinalAnswer({
     workflowRun?.selected_attempt_number ??
     null;
   const totalAttempts = attempts.length || workflowRun?.attempt_count || 0;
-  const attemptSummary = attempts
-    .map((attempt) => {
-      const scoreLabel =
-        attempt.evaluation_score === null ||
-        attempt.evaluation_score === undefined
-          ? attempt.status === 'failed'
-            ? 'failed'
-            : 'unscored'
-          : `${attempt.evaluation_score}/10`;
-      const selectedLabel =
-        workflowRun?.selected_attempt_number === attempt.attempt_number
-          ? ' selected'
-          : '';
-      return `Attempt ${attempt.attempt_number}: ${scoreLabel}${selectedLabel}`;
-    })
-    .join(' · ');
-
-  const pillClassName = isFailed
-    ? ' answer-pill--failed'
-    : result?.status === 'running'
-      ? ' answer-pill--running'
-      : answer
-        ? ' answer-pill--ready'
-        : '';
-
-  const pillLabel = isFailed
-    ? 'Failed'
-    : answer
-      ? 'Reviewed'
-      : result?.status === 'running'
-        ? 'Running'
-        : status || 'Waiting';
+  const attemptSummary = buildAttemptSummary(
+    attempts,
+    workflowRun?.selected_attempt_number ?? null,
+  );
+  const answerPillState = getAnswerPillState(result, answer, status);
 
   return (
     <section className="answer-card">
@@ -136,7 +170,9 @@ export default function FinalAnswer({
           ) : null}
         </div>
 
-        <span className={`answer-pill${pillClassName}`}>{pillLabel}</span>
+        <span className={`answer-pill${answerPillState.className}`}>
+          {answerPillState.label}
+        </span>
       </div>
 
       {attemptSummary ? (

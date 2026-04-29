@@ -67,7 +67,7 @@ const DEMO_SUITE: DemoSuiteCase[] = [
     id: 'finland-job-market',
     label: 'Finland job market',
     query:
-      'Research the 2026 Finland job market for remote backend Python roles. Summarize hiring demand, common skill requirements, any salary signals you can validate, and the main caveats in the available data.',
+      'Research only Finland for remote backend Python roles in 2026. Use at most 3 web lookups and stop once you can report 4 concise bullets: current demand signal, common skills, one salary signal if clearly available, and one caveat about the data. If salary data is not clearly available, say that instead of broadening the search. Do not compare with other countries or expand beyond Finland.',
     passingScore: 7,
   },
   {

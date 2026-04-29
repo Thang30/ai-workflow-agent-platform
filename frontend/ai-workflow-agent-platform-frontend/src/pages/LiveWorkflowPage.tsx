@@ -390,8 +390,9 @@ export default function LiveWorkflowPage() {
     .map((entry) => entry.envelope?.workflow_run?.evaluation_score)
     .filter((score): score is number => score !== null && score !== undefined);
   const averageSuiteScore = suiteScores.length
-    ? (suiteScores.reduce((sum, score) => sum + score, 0) / suiteScores.length)
-        .toFixed(1)
+    ? (
+        suiteScores.reduce((sum, score) => sum + score, 0) / suiteScores.length
+      ).toFixed(1)
     : null;
 
   const stages = [
@@ -494,7 +495,8 @@ export default function LiveWorkflowPage() {
           </div>
 
           <p className="suite-panel__status">
-            {suiteStatus || 'Run the canned prompts in sequence and compare scores.'}
+            {suiteStatus ||
+              'Run the canned prompts in sequence and compare scores.'}
           </p>
         </div>
 

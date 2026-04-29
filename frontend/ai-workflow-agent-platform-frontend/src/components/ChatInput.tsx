@@ -57,7 +57,9 @@ export default function ChatInput({
 
         {presets.length > 0 ? (
           <div className="composer__preset-row">
-            <p className="composer__label composer__label--inline">Demo prompts</p>
+            <p className="composer__label composer__label--inline">
+              Demo prompts
+            </p>
             <div className="composer__preset-list">
               {presets.map((preset) => (
                 <button

@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from uuid import UUID
+
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.agents.executor_agent import ExecutorAgent
@@ -58,3 +60,25 @@ def workflow(input: dict):
 @app.get("/workflow/stream")
 async def workflow_stream(query: str):
     return EventSourceResponse(orchestrator.stream_events(query))
+
+
+@app.get("/runs/stats")
+def workflow_run_stats():
+    return orchestrator.get_run_stats()
+
+
+@app.get("/runs")
+def workflow_runs(
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+):
+    return orchestrator.list_runs(page=page, page_size=page_size)
+
+
+@app.get("/runs/{run_id}")
+def workflow_run(run_id: UUID):
+    result = orchestrator.get_run(str(run_id))
+    if result is None:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+
+    return result

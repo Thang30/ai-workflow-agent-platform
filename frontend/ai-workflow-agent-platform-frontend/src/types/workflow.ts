@@ -13,6 +13,16 @@ export type PlanStep = {
   description: string;
 };
 
+export type WorkflowStatus = 'running' | 'completed' | 'failed';
+
+export type WorkflowTrace = {
+  step: number;
+  description: string;
+  input: string;
+  output: string;
+  tools: ToolCall[];
+};
+
 export type WorkflowStep = PlanStep & {
   status: 'running' | 'done';
   output: string;
@@ -20,10 +30,49 @@ export type WorkflowStep = PlanStep & {
 };
 
 export type WorkflowRun = {
+  id: string;
   query: string;
-  final_answer: string;
-  evaluation_score: number;
-  evaluation_reason: string;
+  status: WorkflowStatus;
+  created_at: string;
+  final_answer: string | null;
+  evaluation_score: number | null;
+  evaluation_reason: string | null;
+  duration_ms: number | null;
+  completed_at: string | null;
+  error_message: string | null;
+};
+
+export type WorkflowRunEnvelope = {
+  input: string;
+  plan: PlanStep[];
+  traces: WorkflowTrace[];
+  final: string | null;
+  workflow_run: WorkflowRun | null;
+};
+
+export type WorkflowRunSummary = {
+  id: string;
+  query: string;
+  status: WorkflowStatus;
+  created_at: string;
+  final_answer: string | null;
+  evaluation_score: number | null;
+  duration_ms: number | null;
+  completed_at: string | null;
+  error_message: string | null;
+};
+
+export type WorkflowRunList = {
+  items: WorkflowRunSummary[];
+  page: number;
+  page_size: number;
+  total: number;
+};
+
+export type WorkflowRunStats = {
+  total_runs: number;
+  average_score: number | null;
+  last_run_at: string | null;
 };
 
 export type WorkflowMessage =

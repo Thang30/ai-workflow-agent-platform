@@ -21,12 +21,6 @@ from app.repositories.workflow_runs import RUN_STATUS_COMPLETED, WorkflowRunRepo
 from app.tools.registry import DEFAULT_TOOL_REGISTRY
 
 
-def save_trace(data):
-    filename = f"trace_{datetime.now().timestamp()}.json"
-    with open(filename, "w") as f:
-        json.dump(data, f, indent=2)
-
-
 @dataclass(slots=True)
 class RetryDecision:
     should_retry: bool
@@ -46,21 +40,31 @@ class WorkflowOrchestrator:
     def __init__(self, repository: WorkflowRunRepository | None = None):
         self.repository = repository or WorkflowRunRepository()
 
+    def _resolve_agent_overrides(
+        self,
+        assignment: ExperimentAssignment | None,
+    ) -> tuple[str | None, dict[str, str]]:
+        if assignment is None:
+            return None, {}
+
+        if assignment.experiment_type == "model":
+            return assignment.variant_config.get("model"), {}
+
+        if assignment.experiment_type != "prompt":
+            return None, {}
+
+        prompt_key = assignment.variant_config.get("prompt_key")
+        prompt_text = assignment.variant_config.get("prompt_text")
+        if prompt_key and prompt_text:
+            return None, {prompt_key: prompt_text}
+
+        return None, {}
+
     def _build_agents(
         self,
         assignment: ExperimentAssignment | None,
     ) -> AgentBundle:
-        model_override: str | None = None
-        prompt_overrides: dict[str, str] = {}
-
-        if assignment is not None:
-            if assignment.experiment_type == "model":
-                model_override = assignment.variant_config.get("model")
-            elif assignment.experiment_type == "prompt":
-                prompt_key = assignment.variant_config.get("prompt_key")
-                prompt_text = assignment.variant_config.get("prompt_text")
-                if prompt_key and prompt_text:
-                    prompt_overrides[prompt_key] = prompt_text
+        model_override, prompt_overrides = self._resolve_agent_overrides(assignment)
 
         return AgentBundle(
             planner=PlannerAgent(
@@ -169,12 +173,6 @@ class WorkflowOrchestrator:
             attempts=attempts or [],
         )
 
-    def _save_workflow_run(
-        self,
-        workflow_payload: WorkflowRunEnvelope,
-    ):
-        save_trace(workflow_payload.to_dict())
-
     def _elapsed_duration_ms(self, started_at: float) -> int:
         return max(0, round((perf_counter() - started_at) * 1000))
 
@@ -261,7 +259,6 @@ class WorkflowOrchestrator:
             selected_attempt=selected_attempt,
             attempts=attempts,
         )
-        self._save_workflow_run(payload)
         return payload
 
     def _finalize_failure(
@@ -281,7 +278,6 @@ class WorkflowOrchestrator:
             final_answer=None,
         )
         payload = self._build_payload(query, workflow_run)
-        self._save_workflow_run(payload)
         return payload
 
     def _run_attempt(

@@ -148,14 +148,6 @@ def _serialize_datetime(value: datetime | None) -> str | None:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _parse_run_id(run_id: str) -> UUID:
-    return UUID(run_id)
-
-
-def _parse_attempt_id(attempt_id: str) -> UUID:
-    return UUID(attempt_id)
-
-
 def _round_float(value: float | None, digits: int = 2) -> float | None:
     if value is None:
         return None
@@ -214,12 +206,15 @@ def _apply_assignment(
     assignment: ExperimentAssignment | None,
 ) -> None:
     if assignment is None:
-        record.experiment_id = None
-        record.experiment_name = None
-        record.experiment_type = None
-        record.variant_id = None
-        record.variant_name = None
-        record.variant_config = None
+        for field_name in (
+            "experiment_id",
+            "experiment_name",
+            "experiment_type",
+            "variant_id",
+            "variant_name",
+            "variant_config",
+        ):
+            setattr(record, field_name, None)
         return
 
     record.experiment_id = (
@@ -521,7 +516,7 @@ class WorkflowRunRepository:
         assignment: ExperimentAssignment | None = None,
     ) -> WorkflowAttempt:
         with self.session_factory() as session:
-            run_record = session.get(WorkflowRunModel, _parse_run_id(run_id))
+            run_record = session.get(WorkflowRunModel, UUID(run_id))
             if run_record is None:
                 raise ValueError(f"Unknown workflow run: {run_id}")
 
@@ -552,7 +547,7 @@ class WorkflowRunRepository:
         traces: list[dict] | None = None,
     ) -> WorkflowRun:
         with self.session_factory() as session:
-            record = session.get(WorkflowRunModel, _parse_run_id(run_id))
+            record = session.get(WorkflowRunModel, UUID(run_id))
             if record is None:
                 raise ValueError(f"Unknown workflow run: {run_id}")
 
@@ -575,7 +570,7 @@ class WorkflowRunRepository:
         had_tool_failure: bool | None = None,
     ) -> WorkflowAttempt:
         with self.session_factory() as session:
-            record = session.get(WorkflowAttemptModel, _parse_attempt_id(attempt_id))
+            record = session.get(WorkflowAttemptModel, UUID(attempt_id))
             if record is None:
                 raise ValueError(f"Unknown workflow attempt: {attempt_id}")
 
@@ -611,7 +606,7 @@ class WorkflowRunRepository:
         had_tool_failure: bool = False,
     ) -> WorkflowAttempt:
         with self.session_factory() as session:
-            record = session.get(WorkflowAttemptModel, _parse_attempt_id(attempt_id))
+            record = session.get(WorkflowAttemptModel, UUID(attempt_id))
             if record is None:
                 raise ValueError(f"Unknown workflow attempt: {attempt_id}")
 
@@ -647,7 +642,7 @@ class WorkflowRunRepository:
         had_tool_failure: bool = False,
     ) -> WorkflowAttempt:
         with self.session_factory() as session:
-            record = session.get(WorkflowAttemptModel, _parse_attempt_id(attempt_id))
+            record = session.get(WorkflowAttemptModel, UUID(attempt_id))
             if record is None:
                 raise ValueError(f"Unknown workflow attempt: {attempt_id}")
 
@@ -678,7 +673,7 @@ class WorkflowRunRepository:
         completed_at: datetime,
     ) -> WorkflowRun:
         with self.session_factory() as session:
-            record = session.get(WorkflowRunModel, _parse_run_id(run_id))
+            record = session.get(WorkflowRunModel, UUID(run_id))
             if record is None:
                 raise ValueError(f"Unknown workflow run: {run_id}")
 
@@ -714,7 +709,7 @@ class WorkflowRunRepository:
         completed_at: datetime,
     ) -> WorkflowRun:
         with self.session_factory() as session:
-            record = session.get(WorkflowRunModel, _parse_run_id(run_id))
+            record = session.get(WorkflowRunModel, UUID(run_id))
             if record is None:
                 raise ValueError(f"Unknown workflow run: {run_id}")
 
@@ -745,7 +740,7 @@ class WorkflowRunRepository:
         final_answer: str | None = None,
     ) -> WorkflowRun:
         with self.session_factory() as session:
-            record = session.get(WorkflowRunModel, _parse_run_id(run_id))
+            record = session.get(WorkflowRunModel, UUID(run_id))
             if record is None:
                 raise ValueError(f"Unknown workflow run: {run_id}")
 
@@ -785,7 +780,7 @@ class WorkflowRunRepository:
 
     def get_run(self, run_id: str) -> WorkflowRunEnvelope | None:
         with self.session_factory() as session:
-            record = session.get(WorkflowRunModel, _parse_run_id(run_id))
+            record = session.get(WorkflowRunModel, UUID(run_id))
             if record is None:
                 return None
 

@@ -48,6 +48,9 @@ class PlannerAgent:
 
         raise ValueError("No valid JSON step list found in model response")
 
+    def _build_fallback_steps(self, query: str):
+        return [{"step": 1, "description": query}]
+
     def run(self, query: str, improvement_hint: str | None = None):
         """
         Generates a step-by-step plan from user query.
@@ -74,9 +77,6 @@ class PlannerAgent:
         response = self.llm.chat(prompt)
 
         try:
-            steps = self._extract_steps(response)
-            return steps
-        except Exception as e:
-            print("Error parsing JSON:", e)
-            print("LLM response was:", response)
-            return [{"step": 1, "description": query}]
+            return self._extract_steps(response)
+        except Exception:
+            return self._build_fallback_steps(query)

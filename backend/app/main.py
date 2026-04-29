@@ -29,33 +29,32 @@ planner = PlannerAgent()
 orchestrator = WorkflowOrchestrator()
 
 
+def _get_query(payload: dict):
+    return payload.get("query", "")
+
+
 @app.get("/")
 def root():
     return {"status": "ok"}
 
 
 @app.post("/chat")
-def chat(input: dict):
-    query = input.get("query", "")
+def chat(payload: dict):
+    query = _get_query(payload)
     response = agent.run(query)
-    print("LLM response:", response)
     return {"response": response}
 
 
 @app.post("/plan")
-def plan(input: dict):
-    query = input.get("query", "")
+def plan(payload: dict):
+    query = _get_query(payload)
     steps = planner.run(query)
-    print("Generated plan:", steps)
     return {"plan": steps}
 
 
 @app.post("/workflow")
-def workflow(input: dict):
-    query = input.get("query", "")
-    result = orchestrator.run(query)
-    print("Workflow result:", result)
-    return result
+def workflow(payload: dict):
+    return orchestrator.run(_get_query(payload))
 
 
 @app.get("/workflow/stream")

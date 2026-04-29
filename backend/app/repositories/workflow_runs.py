@@ -148,14 +148,6 @@ def _serialize_datetime(value: datetime | None) -> str | None:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _parse_run_id(run_id: str) -> UUID:
-    return UUID(run_id)
-
-
-def _parse_attempt_id(attempt_id: str) -> UUID:
-    return UUID(attempt_id)
-
-
 def _round_float(value: float | None, digits: int = 2) -> float | None:
     if value is None:
         return None
@@ -214,12 +206,15 @@ def _apply_assignment(
     assignment: ExperimentAssignment | None,
 ) -> None:
     if assignment is None:
-        record.experiment_id = None
-        record.experiment_name = None
-        record.experiment_type = None
-        record.variant_id = None
-        record.variant_name = None
-        record.variant_config = None
+        for field_name in (
+            "experiment_id",
+            "experiment_name",
+            "experiment_type",
+            "variant_id",
+            "variant_name",
+            "variant_config",
+        ):
+            setattr(record, field_name, None)
         return
 
     record.experiment_id = (
@@ -321,6 +316,72 @@ def _build_envelope(
 class WorkflowRunRepository:
     def __init__(self, session_factory: sessionmaker = SessionLocal):
         self.session_factory = session_factory
+
+    def _get_run_record(self, session, run_id: str) -> WorkflowRunModel:
+        record = session.get(WorkflowRunModel, UUID(run_id))
+        if record is None:
+            raise ValueError(f"Unknown workflow run: {run_id}")
+
+        return record
+
+    def _get_attempt_record(self, session, attempt_id: str) -> WorkflowAttemptModel:
+        record = session.get(WorkflowAttemptModel, UUID(attempt_id))
+        if record is None:
+            raise ValueError(f"Unknown workflow attempt: {attempt_id}")
+
+        return record
+
+    def _sync_run_progress_from_attempt(
+        self,
+        session,
+        attempt_record: WorkflowAttemptModel,
+    ) -> None:
+        run_record = session.get(WorkflowRunModel, attempt_record.run_id)
+        if run_record is None:
+            return
+
+        run_record.plan = attempt_record.plan
+        run_record.traces = attempt_record.traces
+
+    def _set_attempt_terminal_fields(
+        self,
+        attempt_record: WorkflowAttemptModel,
+        *,
+        status: str,
+        plan: list[dict],
+        traces: list[dict],
+        final_answer: str | None,
+        duration_ms: int,
+        completed_at: datetime,
+        had_tool_failure: bool,
+    ) -> None:
+        attempt_record.status = status
+        attempt_record.plan = plan
+        attempt_record.traces = traces
+        attempt_record.final_answer = final_answer
+        attempt_record.duration_ms = duration_ms
+        attempt_record.completed_at = completed_at
+        attempt_record.had_tool_failure = had_tool_failure
+
+    def _set_run_terminal_fields(
+        self,
+        run_record: WorkflowRunModel,
+        *,
+        status: str,
+        plan: list[dict],
+        traces: list[dict],
+        final_answer: str | None,
+        duration_ms: int,
+        completed_at: datetime,
+    ) -> None:
+        run_record.status = status
+        run_record.attempt_count = max(run_record.attempt_count, 1)
+        run_record.selected_attempt_number = run_record.selected_attempt_number or 1
+        run_record.plan = plan
+        run_record.traces = traces
+        run_record.final_answer = final_answer
+        run_record.duration_ms = duration_ms
+        run_record.completed_at = completed_at
 
     def _get_attempt_records(
         self,
@@ -521,9 +582,7 @@ class WorkflowRunRepository:
         assignment: ExperimentAssignment | None = None,
     ) -> WorkflowAttempt:
         with self.session_factory() as session:
-            run_record = session.get(WorkflowRunModel, _parse_run_id(run_id))
-            if run_record is None:
-                raise ValueError(f"Unknown workflow run: {run_id}")
+            run_record = self._get_run_record(session, run_id)
 
             assignment = assignment or _build_assignment(run_record)
 
@@ -552,9 +611,7 @@ class WorkflowRunRepository:
         traces: list[dict] | None = None,
     ) -> WorkflowRun:
         with self.session_factory() as session:
-            record = session.get(WorkflowRunModel, _parse_run_id(run_id))
-            if record is None:
-                raise ValueError(f"Unknown workflow run: {run_id}")
+            record = self._get_run_record(session, run_id)
 
             if plan is not None:
                 record.plan = plan
@@ -575,9 +632,7 @@ class WorkflowRunRepository:
         had_tool_failure: bool | None = None,
     ) -> WorkflowAttempt:
         with self.session_factory() as session:
-            record = session.get(WorkflowAttemptModel, _parse_attempt_id(attempt_id))
-            if record is None:
-                raise ValueError(f"Unknown workflow attempt: {attempt_id}")
+            record = self._get_attempt_record(session, attempt_id)
 
             if plan is not None:
                 record.plan = plan
@@ -588,10 +643,7 @@ class WorkflowRunRepository:
             if had_tool_failure is not None:
                 record.had_tool_failure = had_tool_failure
 
-            run_record = session.get(WorkflowRunModel, record.run_id)
-            if run_record is not None:
-                run_record.plan = record.plan
-                run_record.traces = record.traces
+            self._sync_run_progress_from_attempt(session, record)
 
             session.commit()
             session.refresh(record)
@@ -611,24 +663,22 @@ class WorkflowRunRepository:
         had_tool_failure: bool = False,
     ) -> WorkflowAttempt:
         with self.session_factory() as session:
-            record = session.get(WorkflowAttemptModel, _parse_attempt_id(attempt_id))
-            if record is None:
-                raise ValueError(f"Unknown workflow attempt: {attempt_id}")
+            record = self._get_attempt_record(session, attempt_id)
 
-            record.status = RUN_STATUS_COMPLETED
-            record.plan = plan
-            record.traces = traces
-            record.final_answer = final_answer
+            self._set_attempt_terminal_fields(
+                record,
+                status=RUN_STATUS_COMPLETED,
+                plan=plan,
+                traces=traces,
+                final_answer=final_answer,
+                duration_ms=duration_ms,
+                completed_at=completed_at,
+                had_tool_failure=had_tool_failure,
+            )
             record.evaluation_score = evaluation_score
             record.evaluation_reason = evaluation_reason
-            record.duration_ms = duration_ms
-            record.completed_at = completed_at
-            record.had_tool_failure = had_tool_failure
 
-            run_record = session.get(WorkflowRunModel, record.run_id)
-            if run_record is not None:
-                run_record.plan = plan
-                run_record.traces = traces
+            self._sync_run_progress_from_attempt(session, record)
 
             session.commit()
             session.refresh(record)
@@ -647,23 +697,21 @@ class WorkflowRunRepository:
         had_tool_failure: bool = False,
     ) -> WorkflowAttempt:
         with self.session_factory() as session:
-            record = session.get(WorkflowAttemptModel, _parse_attempt_id(attempt_id))
-            if record is None:
-                raise ValueError(f"Unknown workflow attempt: {attempt_id}")
+            record = self._get_attempt_record(session, attempt_id)
 
-            record.status = RUN_STATUS_FAILED
-            record.plan = plan
-            record.traces = traces
-            record.final_answer = final_answer
+            self._set_attempt_terminal_fields(
+                record,
+                status=RUN_STATUS_FAILED,
+                plan=plan,
+                traces=traces,
+                final_answer=final_answer,
+                duration_ms=duration_ms,
+                completed_at=completed_at,
+                had_tool_failure=had_tool_failure,
+            )
             record.error_message = error_message
-            record.duration_ms = duration_ms
-            record.completed_at = completed_at
-            record.had_tool_failure = had_tool_failure
 
-            run_record = session.get(WorkflowRunModel, record.run_id)
-            if run_record is not None:
-                run_record.plan = plan
-                run_record.traces = traces
+            self._sync_run_progress_from_attempt(session, record)
 
             session.commit()
             session.refresh(record)
@@ -678,9 +726,7 @@ class WorkflowRunRepository:
         completed_at: datetime,
     ) -> WorkflowRun:
         with self.session_factory() as session:
-            record = session.get(WorkflowRunModel, _parse_run_id(run_id))
-            if record is None:
-                raise ValueError(f"Unknown workflow run: {run_id}")
+            record = self._get_run_record(session, run_id)
 
             record.status = selected_attempt.status
             record.attempt_count = max(
@@ -714,20 +760,19 @@ class WorkflowRunRepository:
         completed_at: datetime,
     ) -> WorkflowRun:
         with self.session_factory() as session:
-            record = session.get(WorkflowRunModel, _parse_run_id(run_id))
-            if record is None:
-                raise ValueError(f"Unknown workflow run: {run_id}")
+            record = self._get_run_record(session, run_id)
 
-            record.status = RUN_STATUS_COMPLETED
-            record.attempt_count = max(record.attempt_count, 1)
-            record.selected_attempt_number = record.selected_attempt_number or 1
-            record.plan = plan
-            record.traces = traces
-            record.final_answer = final_answer
+            self._set_run_terminal_fields(
+                record,
+                status=RUN_STATUS_COMPLETED,
+                plan=plan,
+                traces=traces,
+                final_answer=final_answer,
+                duration_ms=duration_ms,
+                completed_at=completed_at,
+            )
             record.evaluation_score = evaluation_score
             record.evaluation_reason = evaluation_reason
-            record.duration_ms = duration_ms
-            record.completed_at = completed_at
 
             session.commit()
             session.refresh(record)
@@ -745,19 +790,18 @@ class WorkflowRunRepository:
         final_answer: str | None = None,
     ) -> WorkflowRun:
         with self.session_factory() as session:
-            record = session.get(WorkflowRunModel, _parse_run_id(run_id))
-            if record is None:
-                raise ValueError(f"Unknown workflow run: {run_id}")
+            record = self._get_run_record(session, run_id)
 
-            record.status = RUN_STATUS_FAILED
-            record.attempt_count = max(record.attempt_count, 1)
-            record.selected_attempt_number = record.selected_attempt_number or 1
-            record.plan = plan
-            record.traces = traces
-            record.final_answer = final_answer
+            self._set_run_terminal_fields(
+                record,
+                status=RUN_STATUS_FAILED,
+                plan=plan,
+                traces=traces,
+                final_answer=final_answer,
+                duration_ms=duration_ms,
+                completed_at=completed_at,
+            )
             record.error_message = error_message
-            record.duration_ms = duration_ms
-            record.completed_at = completed_at
 
             session.commit()
             session.refresh(record)
@@ -785,8 +829,9 @@ class WorkflowRunRepository:
 
     def get_run(self, run_id: str) -> WorkflowRunEnvelope | None:
         with self.session_factory() as session:
-            record = session.get(WorkflowRunModel, _parse_run_id(run_id))
-            if record is None:
+            try:
+                record = self._get_run_record(session, run_id)
+            except ValueError:
                 return None
 
             attempts = [

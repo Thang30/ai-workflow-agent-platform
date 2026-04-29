@@ -19,20 +19,40 @@ def _normalize_query(query: str) -> str:
 
 
 def _format_preview(results: dict[str, Any]) -> str:
-    return "\n".join([item["content"] for item in results.get("results", [])[:3]])
+    return "\n".join(item["content"] for item in results.get("results", [])[:3])
+
+
+def _build_structured_response(
+    *,
+    tool_input: str,
+    raw_output: dict[str, Any],
+    preview: str,
+    success: bool,
+    error_message: str | None = None,
+    started_at: str | None = None,
+    finished_at: str | None = None,
+    elapsed_seconds: float = 0,
+) -> dict[str, Any]:
+    timestamp = started_at or utc_now_iso()
+    return build_tool_response(
+        tool_input=tool_input,
+        raw_output=raw_output,
+        started_at=timestamp,
+        finished_at=finished_at or timestamp,
+        elapsed_seconds=elapsed_seconds,
+        preview=preview,
+        success=success,
+        error_message=error_message,
+    )
 
 
 def web_search(query: str, structured: bool = False) -> str | dict[str, Any]:
     if not settings.tavily_api_key:
         error_message = "Web search unavailable: TAVILY_API_KEY is not configured"
         if structured:
-            now = utc_now_iso()
-            return build_tool_response(
+            return _build_structured_response(
                 tool_input=_normalize_query(query),
                 raw_output={"error": "TAVILY_API_KEY is not configured"},
-                started_at=now,
-                finished_at=now,
-                elapsed_seconds=0,
                 preview=error_message,
                 success=False,
                 error_message="TAVILY_API_KEY is not configured",
@@ -44,13 +64,9 @@ def web_search(query: str, structured: bool = False) -> str | dict[str, Any]:
     if not normalized_query:
         empty_message = "Web search unavailable: empty query"
         if structured:
-            now = utc_now_iso()
-            return build_tool_response(
+            return _build_structured_response(
                 tool_input=normalized_query,
                 raw_output={"results": []},
-                started_at=now,
-                finished_at=now,
-                elapsed_seconds=0,
                 preview=empty_message,
                 success=False,
                 error_message="Empty query",
@@ -67,7 +83,7 @@ def web_search(query: str, structured: bool = False) -> str | dict[str, Any]:
     except Exception as exc:
         error_message = f"Web search unavailable: {exc}"
         if structured:
-            return build_tool_response(
+            return _build_structured_response(
                 tool_input=normalized_query,
                 raw_output={"error": str(exc)},
                 started_at=started_at,
@@ -80,11 +96,9 @@ def web_search(query: str, structured: bool = False) -> str | dict[str, Any]:
 
         return error_message
 
-    print("Web search raw results:", results)
-
     preview = _format_preview(results)
     if structured:
-        return build_tool_response(
+        return _build_structured_response(
             tool_input=normalized_query,
             raw_output=results,
             started_at=started_at,

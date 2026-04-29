@@ -712,6 +712,12 @@
   overflow: hidden;
 }
 
+.tool-card__reason {
+  margin-top: 0.25rem;
+  color: #dbe8f7;
+  line-height: 1.65;
+}
+
 .tool-card__details {
   margin-top: 0.8rem;
   padding-top: 0.8rem;
@@ -838,7 +844,10 @@
 }
 
 .answer-evaluation__score-block {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 0.35rem;
 }
 
@@ -865,6 +874,136 @@
   color: var(--text-soft);
   line-height: 1.65;
   font-size: 0.95rem;
+}
+
+.answer-confidence {
+  display: inline-grid;
+  gap: 0.18rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.answer-confidence--high {
+  border-color: rgba(52, 211, 153, 0.28);
+  background: rgba(5, 150, 105, 0.14);
+}
+
+.answer-confidence--medium {
+  border-color: rgba(251, 191, 36, 0.24);
+  background: rgba(180, 83, 9, 0.14);
+}
+
+.answer-confidence--low {
+  border-color: rgba(248, 113, 113, 0.24);
+  background: rgba(127, 29, 29, 0.18);
+}
+
+.answer-confidence__label {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.answer-confidence__value {
+  color: var(--text);
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.answer-explainability {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(6, 12, 22, 0.58);
+}
+
+.answer-explainability summary {
+  list-style: none;
+  cursor: pointer;
+  color: #dbe8f7;
+  font-weight: 700;
+}
+
+.answer-explainability summary::-webkit-details-marker {
+  display: none;
+}
+
+.answer-explainability summary::after {
+  content: '+';
+  float: right;
+  color: var(--text-soft);
+}
+
+.answer-explainability[open] summary::after {
+  content: '-';
+}
+
+.answer-explainability__content {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.answer-explainability__section {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.answer-explainability__eyebrow {
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.answer-explainability__summary,
+.answer-explainability__plan-copy,
+.answer-explainability__tool-copy {
+  color: var(--text-soft);
+  line-height: 1.7;
+}
+
+.answer-explainability__plan-list,
+.answer-explainability__tool-groups,
+.answer-explainability__tool-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.answer-explainability__plan-list {
+  margin: 0;
+  padding: 0;
+}
+
+.answer-explainability__plan-item,
+.answer-explainability__tool-item,
+.answer-explainability__tool-group {
+  padding: 0.85rem 0.95rem;
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.answer-explainability__plan-item {
+  display: grid;
+  gap: 0.35rem;
+  list-style: none;
+}
+
+.answer-explainability__plan-step,
+.answer-explainability__tool-heading,
+.answer-explainability__tool-name {
+  color: #dbe8f7;
+  font-weight: 700;
+}
+
+.answer-explainability__tool-group {
+  display: grid;
+  gap: 0.75rem;
 }
 
 .answer-body {

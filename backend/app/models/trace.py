@@ -41,6 +41,8 @@ class WorkflowRun:
     final_answer: str | None = None
     evaluation_score: int | None = None
     evaluation_reason: str | None = None
+    confidence_level: str | None = None
+    reasoning_summary: str | None = None
     duration_ms: int | None = None
     completed_at: str | None = None
     error_message: str | None = None
@@ -63,6 +65,8 @@ class WorkflowAttempt:
     final_answer: str | None = None
     evaluation_score: int | None = None
     evaluation_reason: str | None = None
+    confidence_level: str | None = None
+    reasoning_summary: str | None = None
     duration_ms: int | None = None
     completed_at: str | None = None
     error_message: str | None = None

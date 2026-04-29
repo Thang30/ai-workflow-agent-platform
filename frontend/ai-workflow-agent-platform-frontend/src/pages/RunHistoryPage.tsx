@@ -450,6 +450,8 @@ export default function RunHistoryPage() {
                   workflowRun={detailRun}
                   selectedAttempt={selectedAttempt}
                   attempts={attempts}
+                  selectedPlan={selectedPlan}
+                  selectedTraces={selectedTraces}
                   status={formatStatus(detailRun.status)}
                 />
               </div>

@@ -21,6 +21,8 @@ export type ExperimentAssignment = {
   variant_config: Record<string, unknown>;
 };
 
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+
 export type PlanStep = {
   step: number;
   description: string;
@@ -53,6 +55,8 @@ export type WorkflowRun = {
   final_answer: string | null;
   evaluation_score: number | null;
   evaluation_reason: string | null;
+  confidence_level: ConfidenceLevel | null;
+  reasoning_summary: string | null;
   duration_ms: number | null;
   completed_at: string | null;
   error_message: string | null;
@@ -71,6 +75,8 @@ export type WorkflowAttempt = {
   final_answer: string | null;
   evaluation_score: number | null;
   evaluation_reason: string | null;
+  confidence_level: ConfidenceLevel | null;
+  reasoning_summary: string | null;
   duration_ms: number | null;
   completed_at: string | null;
   error_message: string | null;

@@ -1,11 +1,19 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { WorkflowAttempt, WorkflowRun } from '../types/workflow';
+import type {
+  ConfidenceLevel,
+  PlanStep,
+  WorkflowAttempt,
+  WorkflowRun,
+  WorkflowTrace,
+} from '../types/workflow';
 
 type FinalAnswerProps = {
   workflowRun: WorkflowRun | null;
   selectedAttempt?: WorkflowAttempt | null;
   attempts?: WorkflowAttempt[];
+  selectedPlan?: PlanStep[];
+  selectedTraces?: WorkflowTrace[];
   status: string;
 };
 
@@ -18,26 +26,61 @@ const getScoreTone = (score: number | null | undefined) => {
     return ' answer-evaluation--strong';
   }
 
-  if (score >= 5) {
+  if (score >= 6) {
     return ' answer-evaluation--steady';
   }
 
   return ' answer-evaluation--weak';
 };
 
+const deriveConfidenceLevel = (
+  score: number | null | undefined,
+): ConfidenceLevel | null => {
+  if (score === null || score === undefined) {
+    return null;
+  }
+
+  if (score >= 8) {
+    return 'high';
+  }
+
+  if (score >= 6) {
+    return 'medium';
+  }
+
+  return 'low';
+};
+
+const getConfidenceLabel = (level: ConfidenceLevel | null) => {
+  if (!level) {
+    return null;
+  }
+
+  return `${level.slice(0, 1).toUpperCase()}${level.slice(1)}`;
+};
+
 export default function FinalAnswer({
   workflowRun,
   selectedAttempt,
   attempts = [],
+  selectedPlan = [],
+  selectedTraces = [],
   status,
 }: FinalAnswerProps) {
   const result = selectedAttempt ?? workflowRun;
   const answer = result?.final_answer ?? '';
   const isFailed = result?.status === 'failed';
   const showEvaluation =
-    result?.evaluation_score !== null &&
-    result?.evaluation_score !== undefined &&
-    result?.evaluation_reason;
+    result?.evaluation_score !== null && result?.evaluation_score !== undefined;
+  const confidenceLevel =
+    result?.confidence_level ?? deriveConfidenceLevel(result?.evaluation_score);
+  const confidenceLabel = getConfidenceLabel(confidenceLevel);
+  const reasoningSummary = result?.reasoning_summary ?? null;
+  const toolGroups = selectedTraces.filter((trace) => trace.tools.length > 0);
+  const hasExplainability =
+    Boolean(reasoningSummary) ||
+    selectedPlan.length > 0 ||
+    toolGroups.length > 0;
   const selectedAttemptNumber =
     selectedAttempt?.attempt_number ??
     workflowRun?.selected_attempt_number ??
@@ -124,18 +167,33 @@ export default function FinalAnswer({
               className={`answer-evaluation${getScoreTone(result.evaluation_score)}`}
             >
               <div className="answer-evaluation__score-block">
-                <p className="answer-evaluation__eyebrow">Evaluator</p>
-                <div className="answer-evaluation__score">
-                  <span className="answer-evaluation__value">
-                    {result.evaluation_score}
-                  </span>
-                  <span className="answer-evaluation__max">/10</span>
+                <div>
+                  <p className="answer-evaluation__eyebrow">Evaluator</p>
+                  <div className="answer-evaluation__score">
+                    <span className="answer-evaluation__value">
+                      {result.evaluation_score}
+                    </span>
+                    <span className="answer-evaluation__max">/10</span>
+                  </div>
                 </div>
+
+                {confidenceLabel ? (
+                  <div
+                    className={`answer-confidence answer-confidence--${confidenceLevel}`}
+                  >
+                    <span className="answer-confidence__label">Confidence</span>
+                    <span className="answer-confidence__value">
+                      {confidenceLabel}
+                    </span>
+                  </div>
+                ) : null}
               </div>
 
-              <p className="answer-evaluation__reason">
-                {result.evaluation_reason}
-              </p>
+              {result.evaluation_reason ? (
+                <p className="answer-evaluation__reason">
+                  {result.evaluation_reason}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -176,6 +234,81 @@ export default function FinalAnswer({
           </div>
         </div>
       )}
+
+      {hasExplainability ? (
+        <details className="answer-explainability">
+          <summary>Show how this was generated</summary>
+
+          <div className="answer-explainability__content">
+            {reasoningSummary ? (
+              <section className="answer-explainability__section">
+                <p className="answer-explainability__eyebrow">
+                  Reasoning summary
+                </p>
+                <p className="answer-explainability__summary">
+                  {reasoningSummary}
+                </p>
+              </section>
+            ) : null}
+
+            {selectedPlan.length > 0 ? (
+              <section className="answer-explainability__section">
+                <p className="answer-explainability__eyebrow">Plan</p>
+                <ol className="answer-explainability__plan-list">
+                  {selectedPlan.map((step) => (
+                    <li
+                      key={`${step.step}-${step.description}`}
+                      className="answer-explainability__plan-item"
+                    >
+                      <span className="answer-explainability__plan-step">
+                        Step {step.step}
+                      </span>
+                      <span className="answer-explainability__plan-copy">
+                        {step.description}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ) : null}
+
+            {toolGroups.length > 0 ? (
+              <section className="answer-explainability__section">
+                <p className="answer-explainability__eyebrow">Tools used</p>
+                <div className="answer-explainability__tool-groups">
+                  {toolGroups.map((trace) => (
+                    <div
+                      key={`${trace.step}-${trace.description}`}
+                      className="answer-explainability__tool-group"
+                    >
+                      <p className="answer-explainability__tool-heading">
+                        Step {trace.step} · {trace.description}
+                      </p>
+
+                      <div className="answer-explainability__tool-list">
+                        {trace.tools.map((tool, index) => (
+                          <article
+                            key={`${trace.step}-${tool.name}-${index}`}
+                            className="answer-explainability__tool-item"
+                          >
+                            <p className="answer-explainability__tool-name">
+                              {tool.name}
+                            </p>
+                            <p className="answer-explainability__tool-copy">
+                              {tool.reason ??
+                                'No tool-selection reason was recorded for this call.'}
+                            </p>
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </div>
+        </details>
+      ) : null}
     </section>
   );
 }

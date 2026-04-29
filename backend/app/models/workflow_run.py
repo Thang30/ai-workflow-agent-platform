@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -33,6 +34,18 @@ class WorkflowRunModel(Base):
         server_default=text("0"),
     )
     selected_attempt_number: Mapped[int | None] = mapped_column(Integer)
+    experiment_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("experiments.id", ondelete="SET NULL"),
+        index=True,
+    )
+    experiment_name: Mapped[str | None] = mapped_column(String(255))
+    experiment_type: Mapped[str | None] = mapped_column(String(32), index=True)
+    variant_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("experiment_variants.id", ondelete="SET NULL"),
+        index=True,
+    )
+    variant_name: Mapped[str | None] = mapped_column(String(8))
+    variant_config: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     plan: Mapped[list[dict]] = mapped_column(
         JSONB,
         nullable=False,
@@ -84,6 +97,18 @@ class WorkflowAttemptModel(Base):
         nullable=False,
         index=True,
     )
+    experiment_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("experiments.id", ondelete="SET NULL"),
+        index=True,
+    )
+    experiment_name: Mapped[str | None] = mapped_column(String(255))
+    experiment_type: Mapped[str | None] = mapped_column(String(32), index=True)
+    variant_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("experiment_variants.id", ondelete="SET NULL"),
+        index=True,
+    )
+    variant_name: Mapped[str | None] = mapped_column(String(8))
+    variant_config: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     retry_trigger: Mapped[str | None] = mapped_column(Text)

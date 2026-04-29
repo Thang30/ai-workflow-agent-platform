@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import case, func, or_, select
@@ -12,9 +13,12 @@ from app.core.db import SessionLocal
 from app.models.trace import (
     AnalyticsDistribution,
     AnalyticsDistributionBucket,
+    AnalyticsExperimentSummary,
+    AnalyticsExperimentVariantSummary,
     AnalyticsSummary,
     AnalyticsTimeSeries,
     AnalyticsTimeSeriesPoint,
+    ExperimentAssignment,
     WorkflowAttempt,
     AnalyticsToolUsage,
     AnalyticsToolUsageList,
@@ -92,12 +96,52 @@ def _analytics_conditions(days: int) -> list:
     ]
 
 
+def _build_assignment(
+    record: WorkflowRunModel | WorkflowAttemptModel,
+) -> ExperimentAssignment | None:
+    if not record.experiment_name or not record.variant_name:
+        return None
+
+    return ExperimentAssignment(
+        experiment_id=(str(record.experiment_id) if record.experiment_id else None),
+        experiment_name=record.experiment_name or "",
+        experiment_type=record.experiment_type or "",
+        variant_id=(str(record.variant_id) if record.variant_id else None),
+        variant_name=record.variant_name or "",
+        variant_config=record.variant_config or {},
+    )
+
+
+def _apply_assignment(
+    record: WorkflowRunModel | WorkflowAttemptModel,
+    assignment: ExperimentAssignment | None,
+) -> None:
+    if assignment is None:
+        record.experiment_id = None
+        record.experiment_name = None
+        record.experiment_type = None
+        record.variant_id = None
+        record.variant_name = None
+        record.variant_config = None
+        return
+
+    record.experiment_id = (
+        UUID(assignment.experiment_id) if assignment.experiment_id else None
+    )
+    record.experiment_name = assignment.experiment_name
+    record.experiment_type = assignment.experiment_type
+    record.variant_id = UUID(assignment.variant_id) if assignment.variant_id else None
+    record.variant_name = assignment.variant_name
+    record.variant_config = assignment.variant_config or {}
+
+
 def _build_run(record: WorkflowRunModel) -> WorkflowRun:
     return WorkflowRun(
         id=str(record.id),
         query=record.query,
         status=record.status,
         created_at=_serialize_datetime(record.created_at) or "",
+        experiment=_build_assignment(record),
         attempt_count=record.attempt_count,
         selected_attempt_number=record.selected_attempt_number,
         final_answer=record.final_answer,
@@ -115,6 +159,7 @@ def _build_summary(record: WorkflowRunModel) -> WorkflowRunSummary:
         query=record.query,
         status=record.status,
         created_at=_serialize_datetime(record.created_at) or "",
+        experiment=_build_assignment(record),
         attempt_count=record.attempt_count,
         selected_attempt_number=record.selected_attempt_number,
         final_answer=record.final_answer,
@@ -132,6 +177,7 @@ def _build_attempt(record: WorkflowAttemptModel) -> WorkflowAttempt:
         attempt_number=record.attempt_number,
         status=record.status,
         created_at=_serialize_datetime(record.created_at) or "",
+        experiment=_build_assignment(record),
         retry_trigger=record.retry_trigger,
         improvement_hint=record.improvement_hint,
         had_tool_failure=record.had_tool_failure,
@@ -336,13 +382,19 @@ class WorkflowRunRepository:
             "timeseries": timeseries_metrics,
         }
 
-    def create_run(self, query: str) -> WorkflowRun:
+    def create_run(
+        self,
+        query: str,
+        *,
+        assignment: ExperimentAssignment | None = None,
+    ) -> WorkflowRun:
         with self.session_factory() as session:
             record = WorkflowRunModel(
                 query=query,
                 status=RUN_STATUS_RUNNING,
                 attempt_count=0,
             )
+            _apply_assignment(record, assignment)
             session.add(record)
             session.commit()
             session.refresh(record)
@@ -355,11 +407,14 @@ class WorkflowRunRepository:
         attempt_number: int,
         retry_trigger: str | None = None,
         improvement_hint: str | None = None,
+        assignment: ExperimentAssignment | None = None,
     ) -> WorkflowAttempt:
         with self.session_factory() as session:
             run_record = session.get(WorkflowRunModel, _parse_run_id(run_id))
             if run_record is None:
                 raise ValueError(f"Unknown workflow run: {run_id}")
+
+            assignment = assignment or _build_assignment(run_record)
 
             record = WorkflowAttemptModel(
                 run_id=run_record.id,
@@ -368,9 +423,12 @@ class WorkflowRunRepository:
                 retry_trigger=retry_trigger,
                 improvement_hint=improvement_hint,
             )
+            _apply_assignment(record, assignment)
             session.add(record)
             run_record.attempt_count = max(run_record.attempt_count, attempt_number)
             run_record.status = RUN_STATUS_RUNNING
+            if assignment is not None:
+                _apply_assignment(run_record, assignment)
             session.commit()
             session.refresh(record)
             return _build_attempt(record)
@@ -868,3 +926,61 @@ class WorkflowRunRepository:
         ]
 
         return AnalyticsToolUsageList(items=items)
+
+    def get_active_experiment_summary(
+        self,
+        *,
+        experiment_name: str,
+        experiment_type: str,
+        variants: list[dict[str, Any]],
+        days: int = 7,
+    ) -> AnalyticsExperimentSummary:
+        base_conditions = [
+            *_analytics_conditions(days),
+            WorkflowRunModel.experiment_name == experiment_name,
+            WorkflowRunModel.experiment_type == experiment_type,
+        ]
+        failure_condition = _failure_condition()
+
+        variant_summaries: list[AnalyticsExperimentVariantSummary] = []
+
+        with self.session_factory() as session:
+            for variant in variants:
+                variant_name = str(variant.get("name") or "")
+                variant_config = variant.get("config") or {}
+
+                run_count, average_score, average_duration_ms, failure_count = (
+                    session.execute(
+                        select(
+                            func.count(WorkflowRunModel.id),
+                            func.avg(WorkflowRunModel.evaluation_score),
+                            func.avg(WorkflowRunModel.duration_ms),
+                            func.sum(case((failure_condition, 1), else_=0)),
+                        ).where(
+                            *base_conditions,
+                            WorkflowRunModel.variant_name == variant_name,
+                            WorkflowRunModel.variant_config == variant_config,
+                        )
+                    ).one()
+                )
+
+                run_count = int(run_count or 0)
+                failure_count = int(failure_count or 0)
+                variant_summaries.append(
+                    AnalyticsExperimentVariantSummary(
+                        variant_name=variant_name,
+                        variant_config=variant_config,
+                        run_count=run_count,
+                        average_score=_round_float(average_score),
+                        average_duration_ms=_round_float(average_duration_ms),
+                        failure_rate=(
+                            round(failure_count / run_count, 4) if run_count else None
+                        ),
+                    )
+                )
+
+        return AnalyticsExperimentSummary(
+            experiment_name=experiment_name,
+            experiment_type=experiment_type,
+            variants=variant_summaries,
+        )

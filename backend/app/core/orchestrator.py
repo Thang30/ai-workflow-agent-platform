@@ -8,8 +8,10 @@ from app.agents.evaluation_agent import EvaluationAgent
 from app.agents.planner_agent import PlannerAgent
 from app.agents.executor_agent import ExecutorAgent
 from app.agents.reviewer_agent import ReviewerAgent
+from app.core.active_experiment import assign_active_variant, get_active_experiment
 from app.core.config import settings
 from app.models.trace import (
+    ExperimentAssignment,
     StepTrace,
     WorkflowAttempt,
     WorkflowRun,
@@ -31,18 +33,57 @@ class RetryDecision:
     improvement_hint: str | None = None
 
 
+@dataclass(slots=True)
+class AgentBundle:
+    planner: PlannerAgent
+    executor: ExecutorAgent
+    reviewer: ReviewerAgent
+    evaluator: EvaluationAgent
+
+
 class WorkflowOrchestrator:
     def __init__(self, repository: WorkflowRunRepository | None = None):
-        self.planner = PlannerAgent()
-        self.executor = ExecutorAgent()
-        self.reviewer = ReviewerAgent()
-        self.evaluator = EvaluationAgent()
         self.repository = repository or WorkflowRunRepository()
+
+    def _build_agents(
+        self,
+        assignment: ExperimentAssignment | None,
+    ) -> AgentBundle:
+        model_override: str | None = None
+        prompt_overrides: dict[str, str] = {}
+
+        if assignment is not None:
+            if assignment.experiment_type == "model":
+                model_override = assignment.variant_config.get("model")
+            elif assignment.experiment_type == "prompt":
+                prompt_key = assignment.variant_config.get("prompt_key")
+                prompt_text = assignment.variant_config.get("prompt_text")
+                if prompt_key and prompt_text:
+                    prompt_overrides[prompt_key] = prompt_text
+
+        return AgentBundle(
+            planner=PlannerAgent(
+                model=model_override,
+                prompt_overrides=prompt_overrides,
+            ),
+            executor=ExecutorAgent(
+                model=model_override,
+                prompt_overrides=prompt_overrides,
+            ),
+            reviewer=ReviewerAgent(
+                model=model_override,
+                prompt_overrides=prompt_overrides,
+            ),
+            evaluator=EvaluationAgent(
+                model=model_override,
+                prompt_overrides=prompt_overrides,
+            ),
+        )
 
     def _stream_event(self, event: str, data):
         return {"event": event, "data": json.dumps(data, ensure_ascii=False)}
 
-    def _execute_step(self, step: dict, context: str):
+    def _execute_step(self, agents: AgentBundle, step: dict, context: str):
         step_desc = step["description"]
         enriched_input = f"""
             Context so far:
@@ -52,7 +93,7 @@ class WorkflowOrchestrator:
             {step_desc}
             """
 
-        execution = self.executor.execute(enriched_input)
+        execution = agents.executor.execute(enriched_input)
         result = execution["output"]
         tools = execution["tools"]
 
@@ -76,6 +117,7 @@ class WorkflowOrchestrator:
 
     def _review_workflow(
         self,
+        agents: AgentBundle,
         query: str,
         plan: list,
         results: list,
@@ -85,15 +127,20 @@ class WorkflowOrchestrator:
             [f"Step {result['step']}: {result['result']}" for result in results]
         )
 
-        return self.reviewer.run(
+        return agents.reviewer.run(
             query,
             plan,
             formatted_results,
             improvement_hint=improvement_hint,
         )
 
-    def _evaluate_workflow(self, query: str, final_answer: str) -> dict:
-        return self.evaluator.run(query, final_answer)
+    def _evaluate_workflow(
+        self,
+        agents: AgentBundle,
+        query: str,
+        final_answer: str,
+    ) -> dict:
+        return agents.evaluator.run(query, final_answer)
 
     def _build_payload(
         self,
@@ -231,14 +278,17 @@ class WorkflowOrchestrator:
         run_id: str,
         query: str,
         attempt_number: int,
+        agents: AgentBundle,
         retry_trigger: str | None = None,
         improvement_hint: str | None = None,
+        assignment: ExperimentAssignment | None = None,
     ) -> WorkflowAttempt:
         attempt_record = self.repository.create_attempt(
             run_id,
             attempt_number=attempt_number,
             retry_trigger=retry_trigger,
             improvement_hint=improvement_hint,
+            assignment=assignment,
         )
         attempt_started_at = perf_counter()
 
@@ -250,7 +300,7 @@ class WorkflowOrchestrator:
         had_tool_failure = False
 
         try:
-            plan = self.planner.run(query, improvement_hint=improvement_hint)
+            plan = agents.planner.run(query, improvement_hint=improvement_hint)
             self.repository.update_attempt_progress(
                 attempt_record.id,
                 plan=plan,
@@ -259,7 +309,11 @@ class WorkflowOrchestrator:
             )
 
             for step in plan:
-                result_entry, trace, context = self._execute_step(step, context)
+                result_entry, trace, context = self._execute_step(
+                    agents,
+                    step,
+                    context,
+                )
                 traces.append(trace)
                 results.append(result_entry)
                 had_tool_failure = had_tool_failure or self._step_has_tool_failure(
@@ -273,12 +327,13 @@ class WorkflowOrchestrator:
                 )
 
             final_answer = self._review_workflow(
+                agents,
                 query,
                 plan,
                 results,
                 improvement_hint=improvement_hint,
             )
-            evaluation = self._evaluate_workflow(query, final_answer)
+            evaluation = self._evaluate_workflow(agents, query, final_answer)
 
             return self.repository.complete_attempt(
                 attempt_record.id,
@@ -325,8 +380,28 @@ class WorkflowOrchestrator:
     def get_analytics_tools(self, days: int = 7) -> dict:
         return self.repository.get_analytics_tools(days=days).to_dict()
 
+    def get_active_experiment_summary(self, days: int = 7) -> dict | None:
+        active_experiment = get_active_experiment()
+        if active_experiment is None:
+            return None
+
+        return self.repository.get_active_experiment_summary(
+            experiment_name=active_experiment.name,
+            experiment_type=active_experiment.type,
+            variants=[
+                {
+                    "name": variant.name,
+                    "config": dict(variant.config),
+                }
+                for variant in active_experiment.variants
+            ],
+            days=days,
+        ).to_dict()
+
     def run(self, query: str):
-        run_record = self.repository.create_run(query)
+        assignment = assign_active_variant()
+        agents = self._build_agents(assignment)
+        run_record = self.repository.create_run(query, assignment=assignment)
         started_at = perf_counter()
         attempts: list[WorkflowAttempt] = []
         retry_trigger: str | None = None
@@ -338,8 +413,10 @@ class WorkflowOrchestrator:
                     run_record.id,
                     query,
                     attempt_number,
+                    agents,
                     retry_trigger=retry_trigger,
                     improvement_hint=improvement_hint,
+                    assignment=assignment,
                 )
                 attempts.append(attempt)
 
@@ -368,19 +445,32 @@ class WorkflowOrchestrator:
             return payload.to_dict()
 
     async def stream_events(self, query: str):
-        run_record = self.repository.create_run(query)
+        assignment = assign_active_variant()
+        agents = self._build_agents(assignment)
+        run_record = self.repository.create_run(query, assignment=assignment)
         started_at = perf_counter()
         attempts: list[WorkflowAttempt] = []
         retry_trigger: str | None = None
         improvement_hint: str | None = None
 
         try:
+            if assignment is not None:
+                yield self._stream_event(
+                    "experiment_assigned",
+                    assignment.to_dict(),
+                )
+                yield self._stream_event(
+                    "status",
+                    f"🧪 Experiment {assignment.experiment_name} · Variant {assignment.variant_name}",
+                )
+
             for attempt_number in range(1, settings.self_improvement_max_retries + 2):
                 attempt_record = self.repository.create_attempt(
                     run_record.id,
                     attempt_number=attempt_number,
                     retry_trigger=retry_trigger,
                     improvement_hint=improvement_hint,
+                    assignment=assignment,
                 )
 
                 yield self._stream_event(
@@ -405,7 +495,7 @@ class WorkflowOrchestrator:
                 had_tool_failure = False
 
                 try:
-                    plan = self.planner.run(query, improvement_hint=improvement_hint)
+                    plan = agents.planner.run(query, improvement_hint=improvement_hint)
                     self.repository.update_attempt_progress(
                         attempt_record.id,
                         plan=plan,
@@ -432,7 +522,11 @@ class WorkflowOrchestrator:
                             },
                         )
 
-                        result_entry, trace, context = self._execute_step(step, context)
+                        result_entry, trace, context = self._execute_step(
+                            agents,
+                            step,
+                            context,
+                        )
                         traces.append(trace)
                         results.append(result_entry)
                         had_tool_failure = (
@@ -463,6 +557,7 @@ class WorkflowOrchestrator:
                         f"🔍 Reviewing attempt {attempt_number}...",
                     )
                     final_answer = self._review_workflow(
+                        agents,
                         query,
                         plan,
                         results,
@@ -473,7 +568,11 @@ class WorkflowOrchestrator:
                         "status",
                         f"📏 Evaluating attempt {attempt_number}...",
                     )
-                    evaluation = self._evaluate_workflow(query, final_answer)
+                    evaluation = self._evaluate_workflow(
+                        agents,
+                        query,
+                        final_answer,
+                    )
                     attempt = self.repository.complete_attempt(
                         attempt_record.id,
                         plan=plan,

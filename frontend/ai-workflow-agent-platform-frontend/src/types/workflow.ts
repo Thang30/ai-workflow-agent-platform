@@ -10,6 +10,15 @@ export type ToolCall = {
   duration_ms?: number;
 };
 
+export type ExperimentAssignment = {
+  experiment_id: string | null;
+  experiment_name: string;
+  experiment_type: string;
+  variant_id: string | null;
+  variant_name: string;
+  variant_config: Record<string, unknown>;
+};
+
 export type PlanStep = {
   step: number;
   description: string;
@@ -36,6 +45,7 @@ export type WorkflowRun = {
   query: string;
   status: WorkflowStatus;
   created_at: string;
+  experiment: ExperimentAssignment | null;
   attempt_count: number;
   selected_attempt_number: number | null;
   final_answer: string | null;
@@ -52,6 +62,7 @@ export type WorkflowAttempt = {
   attempt_number: number;
   status: WorkflowStatus;
   created_at: string;
+  experiment: ExperimentAssignment | null;
   retry_trigger: string | null;
   improvement_hint: string | null;
   had_tool_failure: boolean;
@@ -79,6 +90,7 @@ export type WorkflowRunSummary = {
   query: string;
   status: WorkflowStatus;
   created_at: string;
+  experiment: ExperimentAssignment | null;
   attempt_count: number;
   selected_attempt_number: number | null;
   final_answer: string | null;
@@ -150,8 +162,24 @@ export type AnalyticsToolUsageList = {
   items: AnalyticsToolUsage[];
 };
 
+export type AnalyticsExperimentVariantSummary = {
+  variant_name: string;
+  variant_config: Record<string, unknown>;
+  run_count: number;
+  average_score: number | null;
+  average_duration_ms: number | null;
+  failure_rate: number | null;
+};
+
+export type AnalyticsExperimentSummary = {
+  experiment_name: string;
+  experiment_type: string;
+  variants: AnalyticsExperimentVariantSummary[];
+};
+
 export type WorkflowMessage =
   | { event: 'status'; data: string }
+  | { event: 'experiment_assigned'; data: ExperimentAssignment }
   | {
       event: 'attempt_start';
       data: {

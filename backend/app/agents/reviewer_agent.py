@@ -1,9 +1,20 @@
+from app.agents.prompts import (
+    DEFAULT_REVIEWER_PROMPT,
+    REVIEWER_PROMPT_KEY,
+    render_prompt,
+    resolve_prompt,
+)
 from app.core.llm import LLMClient
 
 
 class ReviewerAgent:
-    def __init__(self):
-        self.llm = LLMClient()
+    def __init__(
+        self,
+        model: str | None = None,
+        prompt_overrides: dict[str, str] | None = None,
+    ):
+        self.llm = LLMClient(model=model)
+        self.prompt_overrides = prompt_overrides or {}
 
     def run(
         self,
@@ -25,30 +36,18 @@ Retry guidance from the previous attempt:
 Address these issues directly in the final answer.
 """
 
-        prompt = f"""
-You are a senior AI reviewer.
-
-Your job:
-- Combine all step results into a clear, structured final answer
-- Remove redundancy
-- Fix inconsistencies
-- Improve clarity and quality
-
-User request:
-{query}
-
-Steps:
-{steps}
-
-Results:
-{results}
-
-{improvement_section}
-
-Output:
-- Clear final answer
-- Well-structured
-- Concise but complete
-"""
+        prompt = (
+            render_prompt(
+                resolve_prompt(
+                    self.prompt_overrides,
+                    REVIEWER_PROMPT_KEY,
+                    DEFAULT_REVIEWER_PROMPT,
+                ),
+                query=query,
+                steps=str(steps),
+                results=str(results),
+                improvement_section=improvement_section,
+            ),
+        )
 
         return self.llm.chat(prompt)

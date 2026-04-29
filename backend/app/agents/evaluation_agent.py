@@ -1,12 +1,23 @@
 import json
 import re
 
+from app.agents.prompts import (
+    DEFAULT_EVALUATOR_PROMPT,
+    EVALUATOR_PROMPT_KEY,
+    render_prompt,
+    resolve_prompt,
+)
 from app.core.llm import LLMClient
 
 
 class EvaluationAgent:
-    def __init__(self):
-        self.llm = LLMClient()
+    def __init__(
+        self,
+        model: str | None = None,
+        prompt_overrides: dict[str, str] | None = None,
+    ):
+        self.llm = LLMClient(model=model)
+        self.prompt_overrides = prompt_overrides or {}
 
     def _clean_json(self, text: str) -> str:
         return text.strip().replace("```json", "").replace("```", "")
@@ -54,27 +65,14 @@ class EvaluationAgent:
         }
 
     def run(self, query: str, final_answer: str) -> dict:
-        prompt = f"""
-You are an evaluation agent.
-
-Assess how well the final answer satisfies the user's request.
-
-Scoring rules:
-- Use an integer score from 0 to 10
-- 10 means the answer is precise, complete, and directly addresses the request
-- 0 means the answer fails the request entirely
-
-Return valid JSON only in this format:
-{{
-  "score": 8,
-  "reasoning": "Short justification for the score"
-}}
-
-User request:
-{query}
-
-Final answer:
-{final_answer}
-"""
+        prompt = render_prompt(
+            resolve_prompt(
+                self.prompt_overrides,
+                EVALUATOR_PROMPT_KEY,
+                DEFAULT_EVALUATOR_PROMPT,
+            ),
+            query=query,
+            final_answer=final_answer,
+        )
 
         return self._parse_response(self.llm.chat(prompt))

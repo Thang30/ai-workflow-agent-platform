@@ -7,6 +7,7 @@ import TraceView from '../components/TraceView';
 import type {
   WorkflowAttempt,
   WorkflowRunEnvelope,
+  WorkflowRun,
   WorkflowRunStats,
   WorkflowRunSummary,
   WorkflowStatus,
@@ -66,6 +67,21 @@ const buildHistorySteps = (traces: WorkflowTrace[]): WorkflowStep[] => {
     output: trace.output,
     tools: trace.tools,
   }));
+};
+
+const formatExperimentLabel = (
+  experiment:
+    | WorkflowRunSummary['experiment']
+    | WorkflowRun['experiment']
+    | WorkflowAttempt['experiment']
+    | null
+    | undefined,
+) => {
+  if (!experiment) {
+    return 'No experiment';
+  }
+
+  return `${experiment.experiment_name} · Variant ${experiment.variant_name}`;
 };
 
 export default function RunHistoryPage() {
@@ -303,6 +319,12 @@ export default function RunHistoryPage() {
                     {run.attempt_count === 1 ? 'attempt' : 'attempts'}
                   </p>
 
+                  {run.experiment ? (
+                    <p className="history-list__meta history-list__meta--accent">
+                      {formatExperimentLabel(run.experiment)}
+                    </p>
+                  ) : null}
+
                   <p className="history-list__preview">
                     {run.final_answer ??
                       run.error_message ??
@@ -368,6 +390,15 @@ export default function RunHistoryPage() {
                 </article>
 
                 <article className="run-meta-card">
+                  <p className="run-meta-card__label">Experiment</p>
+                  <p className="run-meta-card__value run-meta-card__value--small">
+                    {formatExperimentLabel(
+                      selectedAttempt?.experiment ?? detailRun.experiment,
+                    )}
+                  </p>
+                </article>
+
+                <article className="run-meta-card">
                   <p className="run-meta-card__label">Run ID</p>
                   <p className="run-meta-card__value run-meta-card__value--mono">
                     {detailRun.id}
@@ -396,6 +427,9 @@ export default function RunHistoryPage() {
                       {detailRun.selected_attempt_number ===
                       attempt.attempt_number
                         ? ' · selected'
+                        : ''}
+                      {attempt.experiment
+                        ? ` · ${attempt.experiment.variant_name}`
                         : ''}
                     </button>
                   ))}

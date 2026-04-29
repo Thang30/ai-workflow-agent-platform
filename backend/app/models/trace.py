@@ -5,6 +5,19 @@ from typing import Any
 
 
 @dataclass(slots=True)
+class ExperimentAssignment:
+    experiment_id: str | None
+    experiment_name: str
+    experiment_type: str
+    variant_id: str | None
+    variant_name: str
+    variant_config: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
 class StepTrace:
     step: int
     description: str
@@ -22,6 +35,7 @@ class WorkflowRun:
     query: str
     status: str
     created_at: str
+    experiment: ExperimentAssignment | None = None
     attempt_count: int = 0
     selected_attempt_number: int | None = None
     final_answer: str | None = None
@@ -42,6 +56,7 @@ class WorkflowAttempt:
     attempt_number: int
     status: str
     created_at: str
+    experiment: ExperimentAssignment | None = None
     retry_trigger: str | None = None
     improvement_hint: str | None = None
     had_tool_failure: bool = False
@@ -64,6 +79,7 @@ class WorkflowRunSummary:
     query: str
     status: str
     created_at: str
+    experiment: ExperimentAssignment | None = None
     attempt_count: int = 0
     selected_attempt_number: int | None = None
     final_answer: str | None = None
@@ -197,3 +213,30 @@ class AnalyticsToolUsageList:
 
     def to_dict(self) -> dict[str, Any]:
         return {"items": [item.to_dict() for item in self.items]}
+
+
+@dataclass(slots=True)
+class AnalyticsExperimentVariantSummary:
+    variant_name: str
+    variant_config: dict[str, Any] = field(default_factory=dict)
+    run_count: int = 0
+    average_score: float | None = None
+    average_duration_ms: float | None = None
+    failure_rate: float | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
+class AnalyticsExperimentSummary:
+    experiment_name: str
+    experiment_type: str
+    variants: list[AnalyticsExperimentVariantSummary]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "variants": [item.to_dict() for item in self.variants],
+            "experiment_name": self.experiment_name,
+            "experiment_type": self.experiment_type,
+        }

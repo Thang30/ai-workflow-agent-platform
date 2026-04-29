@@ -42,6 +42,102 @@ SCORE_DISTRIBUTION_BUCKETS = (
 )
 
 
+def _derive_confidence_level(score: int | None) -> str | None:
+    if score is None:
+        return None
+
+    if score >= 8:
+        return "high"
+
+    if score >= 6:
+        return "medium"
+
+    return "low"
+
+
+def _format_tool_name_list(tool_names: list[str]) -> str:
+    if not tool_names:
+        return ""
+
+    if len(tool_names) == 1:
+        return tool_names[0]
+
+    if len(tool_names) == 2:
+        return f"{tool_names[0]} and {tool_names[1]}"
+
+    if len(tool_names) == 3:
+        return f"{tool_names[0]}, {tool_names[1]}, and {tool_names[2]}"
+
+    return f"{tool_names[0]}, {tool_names[1]}, and {len(tool_names) - 2} more"
+
+
+def _build_reasoning_summary(
+    plan: list[dict[str, Any]] | None,
+    traces: list[dict[str, Any]] | None,
+    evaluation_reason: str | None,
+    status: str,
+) -> str | None:
+    normalized_plan = plan or []
+    normalized_traces = traces or []
+    plan_count = len(normalized_plan)
+    completed_count = len(normalized_traces)
+    tool_call_count = 0
+    unique_tool_names: list[str] = []
+    seen_tool_names: set[str] = set()
+
+    for trace in normalized_traces:
+        tools = trace.get("tools") or []
+        tool_call_count += len(tools)
+
+        for tool in tools:
+            tool_name = str(tool.get("name") or "").strip()
+            if not tool_name or tool_name in seen_tool_names:
+                continue
+
+            seen_tool_names.add(tool_name)
+            unique_tool_names.append(tool_name)
+
+    parts: list[str] = []
+
+    if plan_count:
+        if completed_count == 0:
+            parts.append(
+                f"The workflow created a {plan_count}-step plan before execution details were recorded."
+            )
+        elif completed_count >= plan_count:
+            parts.append(
+                f"The workflow followed a {plan_count}-step plan from planning through review."
+            )
+        else:
+            parts.append(
+                f"The workflow planned {plan_count} steps and completed {completed_count} before it stopped."
+            )
+    elif completed_count:
+        parts.append(
+            f"The workflow completed {completed_count} recorded step{'s' if completed_count != 1 else ''}."
+        )
+
+    if tool_call_count:
+        tool_label = "call" if tool_call_count == 1 else "calls"
+        formatted_tools = _format_tool_name_list(unique_tool_names)
+        if formatted_tools:
+            parts.append(
+                f"It used {tool_call_count} tool {tool_label}, including {formatted_tools}."
+            )
+        else:
+            parts.append(f"It used {tool_call_count} tool {tool_label}.")
+    elif completed_count:
+        parts.append("It relied on model reasoning without recorded tool calls.")
+
+    if evaluation_reason:
+        parts.append(evaluation_reason.strip())
+    elif status == RUN_STATUS_FAILED and (plan_count or completed_count):
+        parts.append("The workflow did not produce a scored final answer.")
+
+    summary = " ".join(part for part in parts if part).strip()
+    return summary or None
+
+
 def _serialize_datetime(value: datetime | None) -> str | None:
     if value is None:
         return None
@@ -148,6 +244,13 @@ def _build_run(record: WorkflowRunModel) -> WorkflowRun:
         final_answer=record.final_answer,
         evaluation_score=record.evaluation_score,
         evaluation_reason=record.evaluation_reason,
+        confidence_level=_derive_confidence_level(record.evaluation_score),
+        reasoning_summary=_build_reasoning_summary(
+            record.plan or [],
+            record.traces or [],
+            record.evaluation_reason,
+            record.status,
+        ),
         duration_ms=record.duration_ms,
         completed_at=_serialize_datetime(record.completed_at),
         error_message=record.error_message,
@@ -185,6 +288,13 @@ def _build_attempt(record: WorkflowAttemptModel) -> WorkflowAttempt:
         final_answer=record.final_answer,
         evaluation_score=record.evaluation_score,
         evaluation_reason=record.evaluation_reason,
+        confidence_level=_derive_confidence_level(record.evaluation_score),
+        reasoning_summary=_build_reasoning_summary(
+            record.plan or [],
+            record.traces or [],
+            record.evaluation_reason,
+            record.status,
+        ),
         duration_ms=record.duration_ms,
         completed_at=_serialize_datetime(record.completed_at),
         error_message=record.error_message,

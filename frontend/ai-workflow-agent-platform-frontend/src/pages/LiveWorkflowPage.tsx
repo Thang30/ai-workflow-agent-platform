@@ -168,7 +168,7 @@ export default function LiveWorkflowPage() {
             });
             break;
 
-          case 'final':
+          case 'final': {
             completed = true;
             setWorkflowRun(msg.data.workflow_run);
             setAttempts(msg.data.attempts);
@@ -192,6 +192,7 @@ export default function LiveWorkflowPage() {
             eventSourceRef.current?.close();
             eventSourceRef.current = null;
             break;
+          }
         }
       },
     });
@@ -387,6 +388,8 @@ export default function LiveWorkflowPage() {
             workflowRun={workflowRun}
             selectedAttempt={selectedAttempt}
             attempts={attempts}
+            selectedPlan={selectedAttempt?.plan ?? []}
+            selectedTraces={selectedAttempt?.traces ?? []}
             status={status}
           />
         </section>

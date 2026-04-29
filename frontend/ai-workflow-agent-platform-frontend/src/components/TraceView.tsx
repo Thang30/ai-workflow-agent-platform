@@ -101,6 +101,13 @@ export default function TraceView({ steps, emptyMessage }: TraceViewProps) {
                         {tool.input || tool.query}
                       </pre>
 
+                      {tool.reason ? (
+                        <>
+                          <p className="tool-card__label">Why it was used</p>
+                          <p className="tool-card__reason">{tool.reason}</p>
+                        </>
+                      ) : null}
+
                       {(tool.started_at ||
                         tool.finished_at ||
                         tool.duration_ms !== undefined) && (

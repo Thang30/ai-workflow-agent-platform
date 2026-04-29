@@ -44,7 +44,8 @@ class EvaluationAgent:
         except ValueError:
             return {
                 "score": self._normalize_score(cleaned),
-                "reasoning": cleaned or "The evaluator did not return structured output.",
+                "reasoning": cleaned
+                or "The evaluator did not return structured output.",
             }
 
         reasoning = str(parsed.get("reasoning", "")).strip()

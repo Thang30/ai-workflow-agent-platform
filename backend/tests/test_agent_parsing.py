@@ -29,9 +29,7 @@ class AgentParsingTests(unittest.TestCase):
     def test_planner_parses_fenced_json_with_trailing_commas(self):
         planner = PlannerAgent()
         planner.llm = StubLLM(
-            [
-                "```json\n[{\"step\": 1, \"description\": \"Search docs\",}]\n```"
-            ]
+            ['```json\n[{"step": 1, "description": "Search docs",}]\n```']
         )
 
         result = planner.run("Find the latest docs")
@@ -68,7 +66,7 @@ class AgentParsingTests(unittest.TestCase):
         )
         agent.llm = StubLLM(
             [
-                "```json\n{\"action\": \"use_tool\", \"tool_name\": \"calculator\", \"tool_input\": \"2 + 2\", \"reason\": \"needs math\",}\n```",
+                '```json\n{"action": "use_tool", "tool_name": "calculator", "tool_input": "2 + 2", "reason": "needs math",}\n```',
                 "The answer is 4.",
             ]
         )
@@ -82,7 +80,7 @@ class AgentParsingTests(unittest.TestCase):
     def test_evaluator_parses_fenced_json_object(self):
         evaluator = EvaluationAgent()
         evaluator.llm = StubLLM(
-            ["```json\n{\"score\": 8.6, \"reasoning\": \"Solid evidence.\"}\n```"]
+            ['```json\n{"score": 8.6, "reasoning": "Solid evidence."}\n```']
         )
 
         result = evaluator.run("Question", "Answer")

@@ -18,6 +18,7 @@ from app.models.trace import (
     WorkflowRunEnvelope,
 )
 from app.repositories.workflow_runs import RUN_STATUS_COMPLETED, WorkflowRunRepository
+from app.tools.registry import DEFAULT_TOOL_REGISTRY
 
 
 def save_trace(data):
@@ -69,6 +70,7 @@ class WorkflowOrchestrator:
             executor=ExecutorAgent(
                 model=model_override,
                 prompt_overrides=prompt_overrides,
+                tools=DEFAULT_TOOL_REGISTRY,
             ),
             reviewer=ReviewerAgent(
                 model=model_override,
@@ -83,9 +85,18 @@ class WorkflowOrchestrator:
     def _stream_event(self, event: str, data):
         return {"event": event, "data": json.dumps(data, ensure_ascii=False)}
 
-    def _execute_step(self, agents: AgentBundle, step: dict, context: str):
+    def _execute_step(
+        self,
+        agents: AgentBundle,
+        query: str,
+        step: dict,
+        context: str,
+    ):
         step_desc = step["description"]
         enriched_input = f"""
+            Original user request:
+            {query}
+
             Context so far:
             {context}
 
@@ -311,6 +322,7 @@ class WorkflowOrchestrator:
             for step in plan:
                 result_entry, trace, context = self._execute_step(
                     agents,
+                    query,
                     step,
                     context,
                 )
@@ -524,6 +536,7 @@ class WorkflowOrchestrator:
 
                         result_entry, trace, context = self._execute_step(
                             agents,
+                            query,
                             step,
                             context,
                         )

@@ -1,5 +1,6 @@
 export type ToolCall = {
   name: string;
+  input: string;
   query: string;
   preview: string;
   raw_output?: unknown;
@@ -8,6 +9,7 @@ export type ToolCall = {
   started_at?: string;
   finished_at?: string;
   duration_ms?: number;
+  reason?: string;
 };
 
 export type ExperimentAssignment = {

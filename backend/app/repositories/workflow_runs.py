@@ -10,6 +10,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 from app.core.db import SessionLocal
+from app.models.experiment import ExperimentModel, ExperimentVariantModel
 from app.models.trace import (
     AnalyticsDistribution,
     AnalyticsDistributionBucket,

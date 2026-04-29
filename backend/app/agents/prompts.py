@@ -27,6 +27,7 @@ Rules:
 - Each step must have:
 - step (number)
 - description (string)
+- If one tool can satisfy the request end to end, keep the plan to a single step.
 
 Example:
 [
@@ -40,18 +41,46 @@ $retry_guidance
 """
 
 DEFAULT_EXECUTOR_DECISION_PROMPT = """
-You are an AI assistant.
+You are an execution agent.
 
-If the user asks to search or find information,
-you should say: USE_TOOL
+Decide whether the current workflow step should answer directly or use a tool.
 
-Otherwise respond normally.
+Available tools:
+$available_tools
 
-User query: $query
+Return valid JSON only in this format:
+{
+    "action": "respond" | "use_tool",
+                "tool_name": "web_search" | "calculator" | "current_datetime" | null,
+                "tool_input": "string" | null,
+    "reason": "short explanation"
+}
+
+Rules:
+- Use `web_search` for current events, external facts, or information that requires retrieval beyond the provided context.
+- Use `calculator` for direct arithmetic, formulas, percentages, rates, exponentiation, and deterministic numeric work.
+- Use `current_datetime` when the user asks about today's date, the current time, weekday, relative time, or needs current temporal context.
+- Use `respond` when neither tool is necessary.
+- When action is `respond`, set `tool_name` and `tool_input` to null.
+- When action is `use_tool`, set `tool_name` to one of the listed tools and provide the exact input to run.
+- For `calculator`, prefer a single arithmetic expression or newline-separated assignments like `x = ...` and `result = ...`.
+- The calculator also accepts `print(value)` and simple `for i in range(n):` loops whose bodies contain arithmetic assignments or `*=` style updates.
+- Do not use imports, function definitions, classes, comprehensions, or prose labels like `Year 1:` when calculator syntax will work.
+- For `current_datetime`, provide a short note describing the time context needed.
+- Do not include markdown fences or commentary outside the JSON object.
+
+User query:
+$query
 """
 
 DEFAULT_EXECUTOR_RESPONSE_PROMPT = """
 User query: $query
+
+Decision rationale:
+$decision_reason
+
+Tool name:
+$tool_name
 
 Tool status:
 $tool_status
@@ -60,6 +89,8 @@ Tool result:
 $tool_preview
 
 Generate final answer.
+- If no tool was used, answer directly from the available context.
+- If a tool succeeded, use the tool output materially in the answer.
 - If the tool failed or returned limited data, be explicit about that limitation.
 """
 

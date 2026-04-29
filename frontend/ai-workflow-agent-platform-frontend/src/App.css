@@ -753,6 +753,10 @@
   line-height: 1.6;
 }
 
+.tool-card__input {
+  margin-bottom: 0;
+}
+
 .execution-details {
   margin-top: 1rem;
   padding-top: 1rem;

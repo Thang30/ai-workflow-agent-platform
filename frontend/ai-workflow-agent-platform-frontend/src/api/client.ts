@@ -52,6 +52,14 @@ export const streamWorkflow = (query: string, handlers: StreamHandlers) => {
   return eventSource;
 };
 
+export const runWorkflow = async (query: string) => {
+  const response = await apiClient.post<WorkflowRunEnvelope>('/workflow', {
+    query,
+  });
+
+  return response.data;
+};
+
 export const listRuns = async (page = 1, pageSize = 20) => {
   const response = await apiClient.get<WorkflowRunList>('/runs', {
     params: { page, page_size: pageSize },

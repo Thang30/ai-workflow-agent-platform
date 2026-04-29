@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-import { streamWorkflow } from '../api/client';
+import { runWorkflow, streamWorkflow } from '../api/client';
 import ChatInput from '../components/ChatInput';
 import FinalAnswer from '../components/FinalAnswer';
 import PlanView from '../components/PlanView';
@@ -26,6 +26,19 @@ const buildWorkflowSteps = (traces: WorkflowTrace[]): WorkflowStep[] => {
   }));
 };
 
+const formatDuration = (durationMs: number | null | undefined) => {
+  if (durationMs === null || durationMs === undefined) {
+    return '—';
+  }
+
+  if (durationMs < 1000) {
+    return `${durationMs} ms`;
+  }
+
+  const seconds = durationMs / 1000;
+  return seconds >= 10 ? `${seconds.toFixed(0)} s` : `${seconds.toFixed(1)} s`;
+};
+
 const getSelectedAttempt = (payload: WorkflowRunEnvelope | null) => {
   if (!payload?.workflow_run) {
     return null;
@@ -42,6 +55,68 @@ const getSelectedAttempt = (payload: WorkflowRunEnvelope | null) => {
   );
 };
 
+const DEMO_SUITE = [
+  {
+    id: 'finland-job-market',
+    label: 'Finland job market',
+    query:
+      'Research the 2026 Finland job market for remote backend Python roles. Summarize hiring demand, common skill requirements, any salary signals you can validate, and the main caveats in the available data.',
+  },
+  {
+    id: 'calculate-loan-interest',
+    label: 'Calculate loan interest',
+    query:
+      'Calculate the monthly payment and total interest for a $350,000 mortgage at 6.5% APR over 30 years. Show the formula, the result, and a short plain-English explanation.',
+  },
+  {
+    id: 'compare-ai-models',
+    label: 'Compare AI models',
+    query:
+      'Compare GPT-4.1, Claude 3.7 Sonnet, and Gemini 2.5 Pro for an enterprise coding assistant. Summarize strengths, tradeoffs, and end with a clear recommendation.',
+  },
+] as const;
+
+type DemoSuiteStatus = 'idle' | 'queued' | 'running' | 'completed' | 'failed';
+
+type DemoSuiteResult = {
+  id: string;
+  label: string;
+  query: string;
+  status: DemoSuiteStatus;
+  envelope: WorkflowRunEnvelope | null;
+  errorMessage: string | null;
+};
+
+const getSuiteTone = (status: DemoSuiteStatus) => {
+  switch (status) {
+    case 'completed':
+      return 'done';
+    case 'failed':
+      return 'failed';
+    case 'running':
+      return 'active';
+    case 'queued':
+      return 'queued';
+    default:
+      return 'idle';
+  }
+};
+
+const getSuiteLabel = (status: DemoSuiteStatus) => {
+  switch (status) {
+    case 'completed':
+      return 'Completed';
+    case 'failed':
+      return 'Failed';
+    case 'running':
+      return 'Running';
+    case 'queued':
+      return 'Queued';
+    default:
+      return 'Ready';
+  }
+};
+
 export default function LiveWorkflowPage() {
   const [plan, setPlan] = useState<PlanStep[]>([]);
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
@@ -53,6 +128,9 @@ export default function LiveWorkflowPage() {
   const [assignedExperiment, setAssignedExperiment] =
     useState<ExperimentAssignment | null>(null);
   const [status, setStatus] = useState('');
+  const [isSuiteRunning, setIsSuiteRunning] = useState(false);
+  const [suiteStatus, setSuiteStatus] = useState('');
+  const [suiteResults, setSuiteResults] = useState<DemoSuiteResult[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const handleStream = (query: string) => {
@@ -210,6 +288,63 @@ export default function LiveWorkflowPage() {
     eventSourceRef.current = eventSource;
   };
 
+  const handleRunSuite = async () => {
+    const initialResults: DemoSuiteResult[] = DEMO_SUITE.map((item) => ({
+      ...item,
+      status: 'queued',
+      envelope: null,
+      errorMessage: null,
+    }));
+
+    setSuiteResults(initialResults);
+    setSuiteStatus(`Running ${DEMO_SUITE.length} demo prompts...`);
+    setIsSuiteRunning(true);
+
+    for (const item of DEMO_SUITE) {
+      setSuiteStatus(`Running ${item.label}...`);
+      setSuiteResults((prev) =>
+        prev.map((entry) =>
+          entry.id === item.id ? { ...entry, status: 'running' } : entry,
+        ),
+      );
+
+      try {
+        const envelope = await runWorkflow(item.query);
+        const nextStatus =
+          envelope.workflow_run?.status === 'failed' ? 'failed' : 'completed';
+
+        setSuiteResults((prev) =>
+          prev.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  status: nextStatus,
+                  envelope,
+                  errorMessage: envelope.workflow_run?.error_message ?? null,
+                }
+              : entry,
+          ),
+        );
+      } catch {
+        setSuiteResults((prev) =>
+          prev.map((entry) =>
+            entry.id === item.id
+              ? {
+                  ...entry,
+                  status: 'failed',
+                  errorMessage:
+                    'The request failed before a workflow run completed.',
+                }
+              : entry,
+          ),
+        );
+      }
+    }
+
+    setSuiteStatus('Demo suite completed. Runs were saved to history.');
+    setIsSuiteRunning(false);
+  };
+
   useEffect(() => {
     return () => {
       eventSourceRef.current?.close();
@@ -229,15 +364,35 @@ export default function LiveWorkflowPage() {
       : null) ??
     attempts.at(-1) ??
     null;
-  const isRunning =
+  const isLiveRunning =
     Boolean(status) &&
     status !== 'Completed' &&
     status !== 'Failed' &&
     status !== 'Stream disconnected';
+  const isBusy = isLiveRunning || isSuiteRunning;
   const currentExperiment =
     selectedAttempt?.experiment ??
     workflowRun?.experiment ??
     assignedExperiment;
+  const renderedSuiteResults: DemoSuiteResult[] = DEMO_SUITE.map(
+    (item) =>
+      suiteResults.find((entry) => entry.id === item.id) ?? {
+        ...item,
+        status: 'idle',
+        envelope: null,
+        errorMessage: null,
+      },
+  );
+  const completedSuiteCount = renderedSuiteResults.filter(
+    (entry) => entry.status === 'completed' || entry.status === 'failed',
+  ).length;
+  const suiteScores = renderedSuiteResults
+    .map((entry) => entry.envelope?.workflow_run?.evaluation_score)
+    .filter((score): score is number => score !== null && score !== undefined);
+  const averageSuiteScore = suiteScores.length
+    ? (suiteScores.reduce((sum, score) => sum + score, 0) / suiteScores.length)
+        .toFixed(1)
+    : null;
 
   const stages = [
     {
@@ -319,7 +474,95 @@ export default function LiveWorkflowPage() {
         </div>
       </header>
 
-      <ChatInput onSubmit={handleStream} isRunning={isRunning} />
+      <ChatInput
+        onSubmit={handleStream}
+        isRunning={isLiveRunning}
+        isSuiteRunning={isSuiteRunning}
+        presets={[...DEMO_SUITE]}
+        onRunSuite={() => {
+          if (!isBusy) {
+            void handleRunSuite();
+          }
+        }}
+      />
+
+      <section className="suite-panel">
+        <div className="suite-panel__header">
+          <div>
+            <p className="section-card__eyebrow">Demo suite</p>
+            <h3 className="section-card__title">Batch scorecard</h3>
+          </div>
+
+          <p className="suite-panel__status">
+            {suiteStatus || 'Run the canned prompts in sequence and compare scores.'}
+          </p>
+        </div>
+
+        <div className="suite-panel__overview">
+          <article className="suite-kpi">
+            <p className="suite-kpi__label">Cases</p>
+            <p className="suite-kpi__value">{DEMO_SUITE.length}</p>
+          </article>
+          <article className="suite-kpi">
+            <p className="suite-kpi__label">Completed</p>
+            <p className="suite-kpi__value">
+              {completedSuiteCount}/{DEMO_SUITE.length}
+            </p>
+          </article>
+          <article className="suite-kpi">
+            <p className="suite-kpi__label">Avg score</p>
+            <p className="suite-kpi__value">
+              {averageSuiteScore ? `${averageSuiteScore}/10` : '—'}
+            </p>
+          </article>
+        </div>
+
+        <div className="suite-panel__list">
+          {renderedSuiteResults.map((entry) => (
+            <article
+              key={entry.id}
+              className={`suite-case suite-case--${getSuiteTone(entry.status)}`}
+            >
+              <div className="suite-case__header">
+                <div>
+                  <p className="suite-case__label">{entry.label}</p>
+                  <p className="suite-case__query">{entry.query}</p>
+                </div>
+
+                <span className="suite-case__badge">
+                  {getSuiteLabel(entry.status)}
+                </span>
+              </div>
+
+              <div className="suite-case__meta">
+                <span>
+                  Score:{' '}
+                  {entry.envelope?.workflow_run?.evaluation_score !== null &&
+                  entry.envelope?.workflow_run?.evaluation_score !== undefined
+                    ? `${entry.envelope.workflow_run.evaluation_score}/10`
+                    : '—'}
+                </span>
+                <span>
+                  Attempts: {entry.envelope?.workflow_run?.attempt_count ?? '—'}
+                </span>
+                <span>
+                  Duration:{' '}
+                  {formatDuration(entry.envelope?.workflow_run?.duration_ms)}
+                </span>
+              </div>
+
+              {entry.errorMessage ? (
+                <p className="suite-case__error">{entry.errorMessage}</p>
+              ) : null}
+            </article>
+          ))}
+        </div>
+
+        <p className="suite-panel__note">
+          Each batch run is stored automatically, so the full details also show
+          up in Run history and Analytics.
+        </p>
+      </section>
 
       <main className="workspace-grid">
         <section className="workspace-panel">
@@ -352,7 +595,7 @@ export default function LiveWorkflowPage() {
 
           <div className="live-status">
             <span
-              className={`live-status__dot${isRunning ? ' live-status__dot--active' : ''}`}
+              className={`live-status__dot${isLiveRunning ? ' live-status__dot--active' : ''}`}
             />
             <span>{status || 'Waiting for a workflow request.'}</span>
           </div>

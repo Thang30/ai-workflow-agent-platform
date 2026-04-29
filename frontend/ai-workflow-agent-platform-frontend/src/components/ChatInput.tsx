@@ -1,12 +1,27 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
 
+type PromptPreset = {
+  label: string;
+  query: string;
+};
+
 type ChatInputProps = {
   onSubmit: (query: string) => void;
   isRunning: boolean;
+  isSuiteRunning?: boolean;
+  presets?: PromptPreset[];
+  onRunSuite?: () => void;
 };
 
-export default function ChatInput({ onSubmit, isRunning }: ChatInputProps) {
+export default function ChatInput({
+  onSubmit,
+  isRunning,
+  isSuiteRunning = false,
+  presets = [],
+  onRunSuite,
+}: ChatInputProps) {
   const [query, setQuery] = useState('');
+  const isBusy = isRunning || isSuiteRunning;
 
   const submitQuery = () => {
     const trimmedQuery = query.trim();
@@ -40,6 +55,26 @@ export default function ChatInput({ onSubmit, isRunning }: ChatInputProps) {
           </p>
         </div>
 
+        {presets.length > 0 ? (
+          <div className="composer__preset-row">
+            <p className="composer__label composer__label--inline">Demo prompts</p>
+            <div className="composer__preset-list">
+              {presets.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  className="composer__preset"
+                  disabled={isBusy}
+                  title={preset.query}
+                  onClick={() => setQuery(preset.query)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <label className="composer__label" htmlFor="workflow-query">
           Describe what you want the agent workflow to do.
         </label>
@@ -56,17 +91,36 @@ export default function ChatInput({ onSubmit, isRunning }: ChatInputProps) {
 
         <div className="composer__actions">
           <p className="composer__hint">
-            Cmd/Ctrl + Enter to run. Process stays on the left, result stays on
-            the right.
+            Cmd/Ctrl + Enter runs a live workflow. Demo prompts can preload the
+            editor, or you can run the full suite in batch.
           </p>
 
-          <button
-            className="composer__button"
-            type="submit"
-            disabled={!query.trim() || isRunning}
-          >
-            {isRunning ? 'Running...' : 'Run workflow'}
-          </button>
+          <div className="composer__action-buttons">
+            {onRunSuite ? (
+              <button
+                className="composer__ghost-button"
+                type="button"
+                disabled={isBusy}
+                onClick={onRunSuite}
+              >
+                {isSuiteRunning
+                  ? `Running suite...`
+                  : `Run demo suite (${presets.length})`}
+              </button>
+            ) : null}
+
+            <button
+              className="composer__button"
+              type="submit"
+              disabled={!query.trim() || isBusy}
+            >
+              {isRunning
+                ? 'Running live...'
+                : isSuiteRunning
+                  ? 'Suite running...'
+                  : 'Run workflow'}
+            </button>
+          </div>
         </div>
       </div>
     </form>

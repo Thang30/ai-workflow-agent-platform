@@ -5,6 +5,11 @@ import ChatInput from '../components/ChatInput';
 import FinalAnswer from '../components/FinalAnswer';
 import PlanView from '../components/PlanView';
 import TraceView from '../components/TraceView';
+import { formatDurationMs } from '../utils/formatters';
+import {
+  buildWorkflowSteps,
+  getSelectedAttempt,
+} from '../utils/workflowRunView';
 import type {
   ExperimentAssignment,
   PlanStep,
@@ -13,47 +18,7 @@ import type {
   WorkflowRun,
   WorkflowRunEnvelope,
   WorkflowStep,
-  WorkflowTrace,
 } from '../types/workflow';
-
-const buildWorkflowSteps = (traces: WorkflowTrace[]): WorkflowStep[] => {
-  return traces.map((trace) => ({
-    step: trace.step,
-    description: trace.description,
-    status: 'done',
-    output: trace.output,
-    tools: trace.tools,
-  }));
-};
-
-const formatDuration = (durationMs: number | null | undefined) => {
-  if (durationMs === null || durationMs === undefined) {
-    return '—';
-  }
-
-  if (durationMs < 1000) {
-    return `${durationMs} ms`;
-  }
-
-  const seconds = durationMs / 1000;
-  return seconds >= 10 ? `${seconds.toFixed(0)} s` : `${seconds.toFixed(1)} s`;
-};
-
-const getSelectedAttempt = (payload: WorkflowRunEnvelope | null) => {
-  if (!payload?.workflow_run) {
-    return null;
-  }
-
-  return (
-    payload.attempts.find(
-      (attempt) =>
-        attempt.attempt_number ===
-        payload.workflow_run?.selected_attempt_number,
-    ) ??
-    payload.attempts.at(-1) ??
-    null
-  );
-};
 
 type DemoSuiteCase = {
   id: string;
@@ -103,34 +68,23 @@ type WorkflowStreamOptions = {
   onStatus?: (nextStatus: string) => void;
 };
 
+const DEMO_SUITE_STATUS_META: Record<
+  DemoSuiteStatus,
+  { tone: string; label: string }
+> = {
+  idle: { tone: 'idle', label: 'Ready' },
+  queued: { tone: 'queued', label: 'Queued' },
+  running: { tone: 'active', label: 'Running' },
+  completed: { tone: 'done', label: 'Completed' },
+  failed: { tone: 'failed', label: 'Failed' },
+};
+
 const getSuiteTone = (status: DemoSuiteStatus) => {
-  switch (status) {
-    case 'completed':
-      return 'done';
-    case 'failed':
-      return 'failed';
-    case 'running':
-      return 'active';
-    case 'queued':
-      return 'queued';
-    default:
-      return 'idle';
-  }
+  return DEMO_SUITE_STATUS_META[status].tone;
 };
 
 const getSuiteLabel = (status: DemoSuiteStatus) => {
-  switch (status) {
-    case 'completed':
-      return 'Completed';
-    case 'failed':
-      return 'Failed';
-    case 'running':
-      return 'Running';
-    case 'queued':
-      return 'Queued';
-    default:
-      return 'Ready';
-  }
+  return DEMO_SUITE_STATUS_META[status].label;
 };
 
 const getSuiteOutcome = (entry: DemoSuiteResult) => {
@@ -184,7 +138,10 @@ export default function LiveWorkflowPage() {
 
   const hydrateRunView = (payload: WorkflowRunEnvelope) => {
     const nextWorkflowRun = payload.workflow_run;
-    const nextSelectedAttempt = getSelectedAttempt(payload);
+    const nextSelectedAttempt = getSelectedAttempt(
+      nextWorkflowRun,
+      payload.attempts,
+    );
 
     setWorkflowRun(nextWorkflowRun);
     setAttempts(payload.attempts);
@@ -440,18 +397,11 @@ export default function LiveWorkflowPage() {
   }, []);
 
   const completedSteps = steps.filter((step) => step.status === 'done').length;
-  const selectedAttempt =
-    attempts.find(
-      (attempt) => attempt.attempt_number === currentAttemptNumber,
-    ) ??
-    (workflowRun?.selected_attempt_number
-      ? attempts.find(
-          (attempt) =>
-            attempt.attempt_number === workflowRun.selected_attempt_number,
-        )
-      : null) ??
-    attempts.at(-1) ??
-    null;
+  const selectedAttempt = getSelectedAttempt(
+    workflowRun,
+    attempts,
+    currentAttemptNumber,
+  );
   const isLiveRunning =
     Boolean(status) &&
     status !== 'Completed' &&
@@ -662,7 +612,10 @@ export default function LiveWorkflowPage() {
                   </span>
                   <span>
                     Duration:{' '}
-                    {formatDuration(entry.envelope?.workflow_run?.duration_ms)}
+                    {formatDurationMs(
+                      entry.envelope?.workflow_run?.duration_ms,
+                      { emptyText: '—' },
+                    )}
                   </span>
                 </div>
 

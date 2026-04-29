@@ -1,35 +1,12 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+
+import { formatTimeOfDay, formatToolDurationMs } from '../utils/formatters';
 import type { WorkflowStep } from '../types/workflow';
 
 type TraceViewProps = {
   steps: WorkflowStep[];
   emptyMessage?: string;
-};
-
-const formatTimestamp = (timestamp?: string) => {
-  if (!timestamp) {
-    return null;
-  }
-
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return timestamp;
-  }
-
-  return date.toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-};
-
-const formatDuration = (durationMs?: number) => {
-  if (durationMs === undefined) {
-    return null;
-  }
-
-  return `${durationMs >= 100 ? Math.round(durationMs) : durationMs.toFixed(2)} ms`;
 };
 
 const formatRawOutput = (rawOutput: unknown) => {
@@ -114,19 +91,19 @@ export default function TraceView({ steps, emptyMessage }: TraceViewProps) {
                         <div className="tool-card__metrics">
                           {tool.started_at && (
                             <span className="tool-card__metric">
-                              Started {formatTimestamp(tool.started_at)}
+                              Started {formatTimeOfDay(tool.started_at)}
                             </span>
                           )}
 
                           {tool.finished_at && (
                             <span className="tool-card__metric">
-                              Finished {formatTimestamp(tool.finished_at)}
+                              Finished {formatTimeOfDay(tool.finished_at)}
                             </span>
                           )}
 
                           {tool.duration_ms !== undefined && (
                             <span className="tool-card__metric">
-                              Duration {formatDuration(tool.duration_ms)}
+                              Duration {formatToolDurationMs(tool.duration_ms)}
                             </span>
                           )}
                         </div>

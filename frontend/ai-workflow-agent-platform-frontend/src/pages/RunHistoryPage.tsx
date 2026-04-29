@@ -4,6 +4,11 @@ import { getRun, getRunStats, listRuns } from '../api/client';
 import FinalAnswer from '../components/FinalAnswer';
 import PlanView from '../components/PlanView';
 import TraceView from '../components/TraceView';
+import { formatDateTime, formatDurationMs } from '../utils/formatters';
+import {
+  buildWorkflowSteps,
+  getSelectedAttempt,
+} from '../utils/workflowRunView';
 import type {
   WorkflowAttempt,
   WorkflowRunEnvelope,
@@ -11,42 +16,9 @@ import type {
   WorkflowRunStats,
   WorkflowRunSummary,
   WorkflowStatus,
-  WorkflowStep,
-  WorkflowTrace,
 } from '../types/workflow';
 
 const HISTORY_PAGE_SIZE = 20;
-
-const formatDateTime = (value: string | null | undefined) => {
-  if (!value) {
-    return 'No timestamp yet';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return date.toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
-const formatDuration = (durationMs: number | null | undefined) => {
-  if (durationMs === null || durationMs === undefined) {
-    return 'In progress';
-  }
-
-  if (durationMs < 1000) {
-    return `${durationMs} ms`;
-  }
-
-  const seconds = durationMs / 1000;
-  return seconds >= 10 ? `${seconds.toFixed(0)} s` : `${seconds.toFixed(1)} s`;
-};
 
 const formatStatus = (status: WorkflowStatus) => {
   switch (status) {
@@ -57,16 +29,6 @@ const formatStatus = (status: WorkflowStatus) => {
     default:
       return 'Running';
   }
-};
-
-const buildHistorySteps = (traces: WorkflowTrace[]): WorkflowStep[] => {
-  return traces.map((trace) => ({
-    step: trace.step,
-    description: trace.description,
-    status: 'done',
-    output: trace.output,
-    tools: trace.tools,
-  }));
 };
 
 const formatExperimentLabel = (
@@ -212,23 +174,16 @@ export default function RunHistoryPage() {
   }, [refreshHistory]);
 
   const selectedSummary = runs.find((run) => run.id === selectedRunId) ?? null;
-  const detailRun = selectedRun?.workflow_run;
+  const detailRun = selectedRun?.workflow_run ?? null;
   const attempts = selectedRun?.attempts ?? [];
-  const selectedAttempt: WorkflowAttempt | null =
-    attempts.find(
-      (attempt) => attempt.attempt_number === selectedAttemptNumber,
-    ) ??
-    (detailRun?.selected_attempt_number
-      ? attempts.find(
-          (attempt) =>
-            attempt.attempt_number === detailRun.selected_attempt_number,
-        )
-      : null) ??
-    attempts.at(-1) ??
-    null;
+  const selectedAttempt: WorkflowAttempt | null = getSelectedAttempt(
+    detailRun,
+    attempts,
+    selectedAttemptNumber,
+  );
   const selectedPlan = selectedAttempt?.plan ?? selectedRun?.plan ?? [];
   const selectedTraces = selectedAttempt?.traces ?? selectedRun?.traces ?? [];
-  const historySteps = buildHistorySteps(selectedTraces);
+  const historySteps = buildWorkflowSteps(selectedTraces);
 
   return (
     <>
@@ -315,7 +270,10 @@ export default function RunHistoryPage() {
 
                   <p className="history-list__meta">
                     {formatDateTime(run.created_at)} ·{' '}
-                    {formatDuration(run.duration_ms)} · {run.attempt_count}{' '}
+                    {formatDurationMs(run.duration_ms, {
+                      emptyText: 'In progress',
+                    })}{' '}
+                    · {run.attempt_count}{' '}
                     {run.attempt_count === 1 ? 'attempt' : 'attempts'}
                   </p>
 
@@ -345,7 +303,7 @@ export default function RunHistoryPage() {
 
             <p className="panel-banner__copy">
               {detailRun
-                ? `Status ${formatStatus(detailRun.status).toLowerCase()} · ${formatDuration(detailRun.duration_ms)}`
+                ? `Status ${formatStatus(detailRun.status).toLowerCase()} · ${formatDurationMs(detailRun.duration_ms, { emptyText: 'In progress' })}`
                 : 'Choose a run to inspect its saved plan, traces, and answer.'}
             </p>
           </div>
@@ -378,7 +336,9 @@ export default function RunHistoryPage() {
                 <article className="run-meta-card">
                   <p className="run-meta-card__label">Duration</p>
                   <p className="run-meta-card__value">
-                    {formatDuration(detailRun.duration_ms)}
+                    {formatDurationMs(detailRun.duration_ms, {
+                      emptyText: 'In progress',
+                    })}
                   </p>
                 </article>
 

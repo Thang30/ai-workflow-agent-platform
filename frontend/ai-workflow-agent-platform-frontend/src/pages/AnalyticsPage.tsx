@@ -22,6 +22,7 @@ import {
   getAnalyticsTimeseries,
   getAnalyticsTools,
 } from '../api/client';
+import { formatDurationMs } from '../utils/formatters';
 import type {
   AnalyticsDistribution,
   AnalyticsExperimentSummary,
@@ -78,32 +79,6 @@ const formatImprovement = (value: number | null) => {
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
 };
 
-const formatDuration = (value: number | null) => {
-  if (value === null) {
-    return 'No completed runs';
-  }
-
-  if (value < 1000) {
-    return `${Math.round(value)} ms`;
-  }
-
-  const seconds = value / 1000;
-  return seconds >= 10 ? `${seconds.toFixed(0)} s` : `${seconds.toFixed(1)} s`;
-};
-
-const formatCompactDuration = (value: number | null | undefined) => {
-  if (value === null || value === undefined) {
-    return '—';
-  }
-
-  if (value < 1000) {
-    return `${Math.round(value)} ms`;
-  }
-
-  const seconds = value / 1000;
-  return seconds >= 10 ? `${seconds.toFixed(0)} s` : `${seconds.toFixed(1)} s`;
-};
-
 const formatChartDay = (value: string) => {
   const date = new Date(`${value}T00:00:00Z`);
   if (Number.isNaN(date.getTime())) {
@@ -126,7 +101,10 @@ const formatTooltipValue = (
   }
 
   if (label.includes('duration')) {
-    return [formatCompactDuration(value), label];
+    return [
+      formatDurationMs(value, { emptyText: '—', roundMilliseconds: true }),
+      label,
+    ];
   }
 
   if (label === 'Failure rate') {
@@ -255,7 +233,7 @@ const buildInsights = (
 
   if (summary?.p95_duration_ms) {
     insights.push(
-      `P95 completion time is ${formatDuration(summary.p95_duration_ms)}, which highlights the slower end of the run distribution.`,
+      `P95 completion time is ${formatDurationMs(summary.p95_duration_ms, { emptyText: 'No completed runs', roundMilliseconds: true })}, which highlights the slower end of the run distribution.`,
     );
   }
 
@@ -415,7 +393,10 @@ export default function AnalyticsPage() {
         <article className="overview-card">
           <p className="overview-card__label">Average time</p>
           <p className="overview-card__value">
-            {formatDuration(summary?.average_duration_ms ?? null)}
+            {formatDurationMs(summary?.average_duration_ms ?? null, {
+              emptyText: 'No completed runs',
+              roundMilliseconds: true,
+            })}
           </p>
         </article>
         <article className="overview-card">
@@ -486,7 +467,11 @@ export default function AnalyticsPage() {
                   <p>Average score: {formatScore(variant.average_score)}</p>
                   <p>Failure rate: {formatRate(variant.failure_rate)}</p>
                   <p>
-                    Average time: {formatDuration(variant.average_duration_ms)}
+                    Average time:{' '}
+                    {formatDurationMs(variant.average_duration_ms, {
+                      emptyText: 'No completed runs',
+                      roundMilliseconds: true,
+                    })}
                   </p>
                 </div>
               </article>
@@ -838,7 +823,11 @@ export default function AnalyticsPage() {
                   <h3 className="section-card__title">Tail performance</h3>
                 </div>
                 <p className="section-card__meta">
-                  P95 {formatCompactDuration(summary?.p95_duration_ms)}
+                  P95{' '}
+                  {formatDurationMs(summary?.p95_duration_ms, {
+                    emptyText: '—',
+                    roundMilliseconds: true,
+                  })}
                 </p>
               </div>
               {isLoading ? (

@@ -3,9 +3,10 @@ import type { PlanStep, WorkflowStep } from '../types/workflow';
 type PlanViewProps = {
   plan: PlanStep[];
   steps: WorkflowStep[];
+  emptyMessage?: string;
 };
 
-export default function PlanView({ plan, steps }: PlanViewProps) {
+export default function PlanView({ plan, steps, emptyMessage }: PlanViewProps) {
   return (
     <section className="section-card">
       <div className="section-card__header">
@@ -21,7 +22,8 @@ export default function PlanView({ plan, steps }: PlanViewProps) {
 
       {plan.length === 0 ? (
         <div className="empty-state">
-          Submit a request to see the planner outline a step-by-step workflow.
+          {emptyMessage ??
+            'Submit a request to see the planner outline a step-by-step workflow.'}
         </div>
       ) : (
         <div className="timeline">

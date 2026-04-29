@@ -4,6 +4,7 @@ import type { WorkflowStep } from '../types/workflow';
 
 type TraceViewProps = {
   steps: WorkflowStep[];
+  emptyMessage?: string;
 };
 
 const formatTimestamp = (timestamp?: string) => {
@@ -43,7 +44,7 @@ const formatRawOutput = (rawOutput: unknown) => {
   return JSON.stringify(rawOutput, null, 2);
 };
 
-export default function TraceView({ steps }: TraceViewProps) {
+export default function TraceView({ steps, emptyMessage }: TraceViewProps) {
   const completedSteps = steps.filter((step) => step.status === 'done').length;
 
   return (
@@ -63,8 +64,8 @@ export default function TraceView({ steps }: TraceViewProps) {
 
       {steps.length === 0 ? (
         <div className="empty-state">
-          As each planned step starts, it appears here with status, tool usage,
-          and expandable output.
+          {emptyMessage ??
+            'As each planned step starts, it appears here with status, tool usage, and expandable output.'}
         </div>
       ) : (
         <div className="execution-stack">

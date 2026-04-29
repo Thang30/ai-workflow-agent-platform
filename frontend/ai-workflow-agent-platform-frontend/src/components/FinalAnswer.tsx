@@ -7,8 +7,45 @@ type FinalAnswerProps = {
   status: string;
 };
 
+const getScoreTone = (score: number | null | undefined) => {
+  if (score === null || score === undefined) {
+    return '';
+  }
+
+  if (score >= 8) {
+    return ' answer-evaluation--strong';
+  }
+
+  if (score >= 5) {
+    return ' answer-evaluation--steady';
+  }
+
+  return ' answer-evaluation--weak';
+};
+
 export default function FinalAnswer({ workflowRun, status }: FinalAnswerProps) {
   const answer = workflowRun?.final_answer ?? '';
+  const isFailed = workflowRun?.status === 'failed';
+  const showEvaluation =
+    workflowRun?.evaluation_score !== null &&
+    workflowRun?.evaluation_score !== undefined &&
+    workflowRun?.evaluation_reason;
+
+  const pillClassName = isFailed
+    ? ' answer-pill--failed'
+    : workflowRun?.status === 'running'
+      ? ' answer-pill--running'
+      : answer
+        ? ' answer-pill--ready'
+        : '';
+
+  const pillLabel = isFailed
+    ? 'Failed'
+    : answer
+      ? 'Reviewed'
+      : workflowRun?.status === 'running'
+        ? 'Running'
+        : status || 'Waiting';
 
   return (
     <section className="answer-card">
@@ -18,15 +55,22 @@ export default function FinalAnswer({ workflowRun, status }: FinalAnswerProps) {
           <h3 className="section-card__title">Final answer</h3>
         </div>
 
-        <span className={`answer-pill${answer ? ' answer-pill--ready' : ''}`}>
-          {answer ? 'Reviewed' : status || 'Waiting'}
-        </span>
+        <span className={`answer-pill${pillClassName}`}>{pillLabel}</span>
       </div>
+
+      {workflowRun?.error_message ? (
+        <div className="answer-alert">
+          <p className="answer-alert__label">Workflow note</p>
+          <p className="answer-alert__copy">{workflowRun.error_message}</p>
+        </div>
+      ) : null}
 
       {answer ? (
         <>
-          {workflowRun ? (
-            <div className="answer-evaluation">
+          {workflowRun && showEvaluation ? (
+            <div
+              className={`answer-evaluation${getScoreTone(workflowRun.evaluation_score)}`}
+            >
               <div className="answer-evaluation__score-block">
                 <p className="answer-evaluation__eyebrow">Evaluator</p>
                 <div className="answer-evaluation__score">
@@ -52,6 +96,19 @@ export default function FinalAnswer({ workflowRun, status }: FinalAnswerProps) {
             </div>
           </div>
         </>
+      ) : isFailed ? (
+        <div className="answer-empty answer-empty--failure">
+          <div className="answer-empty__panel">
+            <p className="answer-empty__eyebrow">Workflow failed</p>
+            <h4 className="answer-empty__title">
+              This run stopped before it produced a final answer.
+            </h4>
+            <p className="answer-empty__copy">
+              The saved plan and traces still appear alongside this panel so you
+              can inspect how far the workflow progressed.
+            </p>
+          </div>
+        </div>
       ) : (
         <div className="answer-empty">
           <div className="answer-empty__panel">

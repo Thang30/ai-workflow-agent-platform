@@ -38,10 +38,14 @@ User query: {query}
             final_prompt = f"""
 User query: {query}
 
+Tool status:
+{'success' if tool_result['success'] else 'failure'}
+
 Tool result:
 {tool_result["preview"]}
 
 Generate final answer.
+- If the tool failed or returned limited data, be explicit about that limitation.
 """
             return {
                 "output": self.llm.chat(final_prompt),
@@ -51,6 +55,8 @@ Generate final answer.
                         "query": tool_result["query"],
                         "preview": tool_result["preview"],
                         "raw_output": tool_result["raw_output"],
+                        "success": tool_result["success"],
+                        "error_message": tool_result["error_message"],
                         "started_at": tool_result["started_at"],
                         "finished_at": tool_result["finished_at"],
                         "duration_ms": tool_result["duration_ms"],

@@ -1,5 +1,6 @@
 import asyncio
 import json
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from time import perf_counter
 
@@ -7,14 +8,27 @@ from app.agents.evaluation_agent import EvaluationAgent
 from app.agents.planner_agent import PlannerAgent
 from app.agents.executor_agent import ExecutorAgent
 from app.agents.reviewer_agent import ReviewerAgent
-from app.models.trace import StepTrace, WorkflowRun, WorkflowRunEnvelope
-from app.repositories.workflow_runs import WorkflowRunRepository
+from app.core.config import settings
+from app.models.trace import (
+    StepTrace,
+    WorkflowAttempt,
+    WorkflowRun,
+    WorkflowRunEnvelope,
+)
+from app.repositories.workflow_runs import RUN_STATUS_COMPLETED, WorkflowRunRepository
 
 
 def save_trace(data):
     filename = f"trace_{datetime.now().timestamp()}.json"
     with open(filename, "w") as f:
         json.dump(data, f, indent=2)
+
+
+@dataclass(slots=True)
+class RetryDecision:
+    should_retry: bool
+    trigger: str | None = None
+    improvement_hint: str | None = None
 
 
 class WorkflowOrchestrator:
@@ -65,12 +79,18 @@ class WorkflowOrchestrator:
         query: str,
         plan: list,
         results: list,
+        improvement_hint: str | None = None,
     ) -> str:
         formatted_results = "\n".join(
             [f"Step {result['step']}: {result['result']}" for result in results]
         )
 
-        return self.reviewer.run(query, plan, formatted_results)
+        return self.reviewer.run(
+            query,
+            plan,
+            formatted_results,
+            improvement_hint=improvement_hint,
+        )
 
     def _evaluate_workflow(self, query: str, final_answer: str) -> dict:
         return self.evaluator.run(query, final_answer)
@@ -78,16 +98,17 @@ class WorkflowOrchestrator:
     def _build_payload(
         self,
         query: str,
-        plan: list,
-        traces: list,
         workflow_run: WorkflowRun,
+        selected_attempt: WorkflowAttempt | None = None,
+        attempts: list[WorkflowAttempt] | None = None,
     ) -> WorkflowRunEnvelope:
         return WorkflowRunEnvelope(
             input=query,
-            plan=plan,
-            traces=traces,
+            plan=selected_attempt.plan if selected_attempt else [],
+            traces=selected_attempt.traces if selected_attempt else [],
             final=workflow_run.final_answer,
             workflow_run=workflow_run,
+            attempts=attempts or [],
         )
 
     def _save_workflow_run(
@@ -99,27 +120,89 @@ class WorkflowOrchestrator:
     def _elapsed_duration_ms(self, started_at: float) -> int:
         return max(0, round((perf_counter() - started_at) * 1000))
 
-    def _finalize_success(
+    def _step_has_tool_failure(self, tools: list[dict]) -> bool:
+        return any(
+            isinstance(tool, dict)
+            and (tool.get("success") is False or bool(tool.get("error_message")))
+            for tool in tools
+        )
+
+    def _build_retry_decision(self, attempt: WorkflowAttempt) -> RetryDecision:
+        trigger_parts: list[str] = []
+        guidance_parts: list[str] = []
+
+        if attempt.status != RUN_STATUS_COMPLETED:
+            trigger_parts.append("attempt_failure")
+            guidance_parts.append("The previous attempt failed before completing.")
+
+        if attempt.had_tool_failure:
+            trigger_parts.append("tool_failure")
+            guidance_parts.append(
+                "A required tool failed or returned unavailable data. Recover gracefully and be explicit about missing information."
+            )
+
+        if (
+            attempt.evaluation_score is not None
+            and attempt.evaluation_score < settings.self_improvement_low_score_threshold
+        ):
+            trigger_parts.append("low_score")
+            guidance_parts.append(
+                f"The evaluation score was {attempt.evaluation_score}/10, below the threshold of {settings.self_improvement_low_score_threshold}."
+            )
+
+        if not trigger_parts:
+            return RetryDecision(should_retry=False)
+
+        if attempt.evaluation_reason:
+            guidance_parts.append(f"Evaluator feedback: {attempt.evaluation_reason}")
+
+        if attempt.error_message:
+            guidance_parts.append(f"Failure details: {attempt.error_message}")
+
+        guidance_parts.append(
+            "Improve the next attempt by being more concrete, complete, and transparent about any remaining uncertainty."
+        )
+
+        return RetryDecision(
+            should_retry=True,
+            trigger=", ".join(trigger_parts),
+            improvement_hint="\n".join(guidance_parts),
+        )
+
+    def _select_best_attempt(self, attempts: list[WorkflowAttempt]) -> WorkflowAttempt:
+        return max(
+            attempts,
+            key=lambda attempt: (
+                (
+                    attempt.evaluation_score
+                    if attempt.evaluation_score is not None
+                    else -1
+                ),
+                1 if attempt.status == RUN_STATUS_COMPLETED else 0,
+                -attempt.attempt_number,
+            ),
+        )
+
+    def _finalize_run(
         self,
         run_id: str,
         query: str,
-        plan: list,
-        traces: list,
-        final_answer: str,
+        attempts: list[WorkflowAttempt],
         started_at: float,
     ) -> WorkflowRunEnvelope:
-        evaluation = self._evaluate_workflow(query, final_answer)
-        workflow_run = self.repository.complete_run(
+        selected_attempt = self._select_best_attempt(attempts)
+        workflow_run = self.repository.finalize_run(
             run_id,
-            plan=plan,
-            traces=traces,
-            final_answer=final_answer,
-            evaluation_score=evaluation["score"],
-            evaluation_reason=evaluation["reasoning"],
+            selected_attempt=selected_attempt,
             duration_ms=self._elapsed_duration_ms(started_at),
             completed_at=datetime.now(timezone.utc),
         )
-        payload = self._build_payload(query, plan, traces, workflow_run)
+        payload = self._build_payload(
+            query,
+            workflow_run,
+            selected_attempt=selected_attempt,
+            attempts=attempts,
+        )
         self._save_workflow_run(payload)
         return payload
 
@@ -127,24 +210,98 @@ class WorkflowOrchestrator:
         self,
         run_id: str,
         query: str,
-        plan: list,
-        traces: list,
         error: Exception,
         started_at: float,
-        final_answer: str | None = None,
     ) -> WorkflowRunEnvelope:
         workflow_run = self.repository.fail_run(
             run_id,
-            plan=plan,
-            traces=traces,
+            plan=[],
+            traces=[],
             error_message=str(error),
             duration_ms=self._elapsed_duration_ms(started_at),
             completed_at=datetime.now(timezone.utc),
-            final_answer=final_answer,
+            final_answer=None,
         )
-        payload = self._build_payload(query, plan, traces, workflow_run)
+        payload = self._build_payload(query, workflow_run)
         self._save_workflow_run(payload)
         return payload
+
+    def _run_attempt(
+        self,
+        run_id: str,
+        query: str,
+        attempt_number: int,
+        retry_trigger: str | None = None,
+        improvement_hint: str | None = None,
+    ) -> WorkflowAttempt:
+        attempt_record = self.repository.create_attempt(
+            run_id,
+            attempt_number=attempt_number,
+            retry_trigger=retry_trigger,
+            improvement_hint=improvement_hint,
+        )
+        attempt_started_at = perf_counter()
+
+        plan = []
+        results = []
+        context = ""
+        traces = []
+        final_answer: str | None = None
+        had_tool_failure = False
+
+        try:
+            plan = self.planner.run(query, improvement_hint=improvement_hint)
+            self.repository.update_attempt_progress(
+                attempt_record.id,
+                plan=plan,
+                traces=traces,
+                had_tool_failure=had_tool_failure,
+            )
+
+            for step in plan:
+                result_entry, trace, context = self._execute_step(step, context)
+                traces.append(trace)
+                results.append(result_entry)
+                had_tool_failure = had_tool_failure or self._step_has_tool_failure(
+                    result_entry["tools"]
+                )
+                self.repository.update_attempt_progress(
+                    attempt_record.id,
+                    plan=plan,
+                    traces=traces,
+                    had_tool_failure=had_tool_failure,
+                )
+
+            final_answer = self._review_workflow(
+                query,
+                plan,
+                results,
+                improvement_hint=improvement_hint,
+            )
+            evaluation = self._evaluate_workflow(query, final_answer)
+
+            return self.repository.complete_attempt(
+                attempt_record.id,
+                plan=plan,
+                traces=traces,
+                final_answer=final_answer,
+                evaluation_score=evaluation["score"],
+                evaluation_reason=evaluation["reasoning"],
+                duration_ms=self._elapsed_duration_ms(attempt_started_at),
+                completed_at=datetime.now(timezone.utc),
+                had_tool_failure=had_tool_failure,
+            )
+        except Exception as error:
+            return self.repository.fail_attempt(
+                attempt_record.id,
+                plan=plan,
+                traces=traces,
+                error_message=str(error),
+                duration_ms=self._elapsed_duration_ms(attempt_started_at),
+                completed_at=datetime.now(timezone.utc),
+                final_answer=final_answer,
+                had_tool_failure=had_tool_failure,
+            )
 
     def list_runs(self, page: int = 1, page_size: int = 20) -> dict:
         return self.repository.list_runs(page=page, page_size=page_size).to_dict()
@@ -169,43 +326,35 @@ class WorkflowOrchestrator:
         return self.repository.get_analytics_tools(days=days).to_dict()
 
     def run(self, query: str):
-        """
-        Full workflow:
-        1. Generate plan
-        2. Execute each step
-        3. Collect results
-        """
-
         run_record = self.repository.create_run(query)
         started_at = perf_counter()
-
-        plan = []
-        results = []
-        context = ""
-        traces = []
-        final_answer: str | None = None
+        attempts: list[WorkflowAttempt] = []
+        retry_trigger: str | None = None
+        improvement_hint: str | None = None
 
         try:
-            plan = self.planner.run(query)
-            self.repository.update_run_progress(run_record.id, plan=plan)
-
-            for step in plan:
-                result_entry, trace, context = self._execute_step(step, context)
-                traces.append(trace)
-                results.append(result_entry)
-                self.repository.update_run_progress(
+            for attempt_number in range(1, settings.self_improvement_max_retries + 2):
+                attempt = self._run_attempt(
                     run_record.id,
-                    plan=plan,
-                    traces=traces,
+                    query,
+                    attempt_number,
+                    retry_trigger=retry_trigger,
+                    improvement_hint=improvement_hint,
                 )
+                attempts.append(attempt)
 
-            final_answer = self._review_workflow(query, plan, results)
-            payload = self._finalize_success(
+                retry_decision = self._build_retry_decision(attempt)
+                can_retry = attempt_number <= settings.self_improvement_max_retries
+                if not retry_decision.should_retry or not can_retry:
+                    break
+
+                retry_trigger = retry_decision.trigger
+                improvement_hint = retry_decision.improvement_hint
+
+            payload = self._finalize_run(
                 run_record.id,
                 query,
-                plan,
-                traces,
-                final_answer,
+                attempts,
                 started_at,
             )
             return payload.to_dict()
@@ -213,83 +362,178 @@ class WorkflowOrchestrator:
             payload = self._finalize_failure(
                 run_record.id,
                 query,
-                plan,
-                traces,
                 error,
                 started_at,
-                final_answer=final_answer,
             )
             return payload.to_dict()
 
     async def stream_events(self, query: str):
         run_record = self.repository.create_run(query)
         started_at = perf_counter()
-
-        yield self._stream_event("status", "🧠 Planning...")
-
-        plan = []
-        results = []
-        traces = []
-        context = ""
-        final_answer: str | None = None
+        attempts: list[WorkflowAttempt] = []
+        retry_trigger: str | None = None
+        improvement_hint: str | None = None
 
         try:
-            plan = self.planner.run(query)
-            self.repository.update_run_progress(run_record.id, plan=plan)
-
-            yield self._stream_event("plan", plan)
-            yield self._stream_event("status", "⚙️ Executing...")
-
-            for step in plan:
-                yield self._stream_event(
-                    "step_start",
-                    {"step": step["step"], "description": step["description"]},
-                )
-
-                result_entry, trace, context = self._execute_step(step, context)
-                traces.append(trace)
-                results.append(result_entry)
-                self.repository.update_run_progress(
+            for attempt_number in range(1, settings.self_improvement_max_retries + 2):
+                attempt_record = self.repository.create_attempt(
                     run_record.id,
-                    plan=plan,
-                    traces=traces,
+                    attempt_number=attempt_number,
+                    retry_trigger=retry_trigger,
+                    improvement_hint=improvement_hint,
                 )
 
                 yield self._stream_event(
-                    "step_done",
+                    "attempt_start",
                     {
-                        "step": step["step"],
-                        "output": result_entry["result"],
-                        "tools": result_entry["tools"],
+                        "attempt_number": attempt_number,
+                        "retry_trigger": retry_trigger,
+                        "improvement_hint": improvement_hint,
                     },
                 )
+                yield self._stream_event(
+                    "status",
+                    f"🧠 Planning attempt {attempt_number}...",
+                )
 
-                await asyncio.sleep(0.1)
+                attempt_started_at = perf_counter()
+                plan = []
+                results = []
+                traces = []
+                context = ""
+                final_answer: str | None = None
+                had_tool_failure = False
 
-            yield self._stream_event("status", "🔍 Reviewing...")
+                try:
+                    plan = self.planner.run(query, improvement_hint=improvement_hint)
+                    self.repository.update_attempt_progress(
+                        attempt_record.id,
+                        plan=plan,
+                        traces=traces,
+                        had_tool_failure=had_tool_failure,
+                    )
 
-            final_answer = self._review_workflow(query, plan, results)
+                    yield self._stream_event(
+                        "plan",
+                        {"attempt_number": attempt_number, "plan": plan},
+                    )
+                    yield self._stream_event(
+                        "status",
+                        f"⚙️ Executing attempt {attempt_number}...",
+                    )
 
-            yield self._stream_event("status", "📏 Evaluating...")
+                    for step in plan:
+                        yield self._stream_event(
+                            "step_start",
+                            {
+                                "attempt_number": attempt_number,
+                                "step": step["step"],
+                                "description": step["description"],
+                            },
+                        )
 
-            payload = self._finalize_success(
+                        result_entry, trace, context = self._execute_step(step, context)
+                        traces.append(trace)
+                        results.append(result_entry)
+                        had_tool_failure = (
+                            had_tool_failure
+                            or self._step_has_tool_failure(result_entry["tools"])
+                        )
+                        self.repository.update_attempt_progress(
+                            attempt_record.id,
+                            plan=plan,
+                            traces=traces,
+                            had_tool_failure=had_tool_failure,
+                        )
+
+                        yield self._stream_event(
+                            "step_done",
+                            {
+                                "attempt_number": attempt_number,
+                                "step": step["step"],
+                                "output": result_entry["result"],
+                                "tools": result_entry["tools"],
+                            },
+                        )
+
+                        await asyncio.sleep(0.1)
+
+                    yield self._stream_event(
+                        "status",
+                        f"🔍 Reviewing attempt {attempt_number}...",
+                    )
+                    final_answer = self._review_workflow(
+                        query,
+                        plan,
+                        results,
+                        improvement_hint=improvement_hint,
+                    )
+
+                    yield self._stream_event(
+                        "status",
+                        f"📏 Evaluating attempt {attempt_number}...",
+                    )
+                    evaluation = self._evaluate_workflow(query, final_answer)
+                    attempt = self.repository.complete_attempt(
+                        attempt_record.id,
+                        plan=plan,
+                        traces=traces,
+                        final_answer=final_answer,
+                        evaluation_score=evaluation["score"],
+                        evaluation_reason=evaluation["reasoning"],
+                        duration_ms=self._elapsed_duration_ms(attempt_started_at),
+                        completed_at=datetime.now(timezone.utc),
+                        had_tool_failure=had_tool_failure,
+                    )
+                except Exception as error:
+                    attempt = self.repository.fail_attempt(
+                        attempt_record.id,
+                        plan=plan,
+                        traces=traces,
+                        error_message=str(error),
+                        duration_ms=self._elapsed_duration_ms(attempt_started_at),
+                        completed_at=datetime.now(timezone.utc),
+                        final_answer=final_answer,
+                        had_tool_failure=had_tool_failure,
+                    )
+
+                attempts.append(attempt)
+                yield self._stream_event("attempt_complete", attempt.to_dict())
+
+                retry_decision = self._build_retry_decision(attempt)
+                can_retry = attempt_number <= settings.self_improvement_max_retries
+                if not retry_decision.should_retry or not can_retry:
+                    break
+
+                retry_trigger = retry_decision.trigger
+                improvement_hint = retry_decision.improvement_hint
+                yield self._stream_event(
+                    "status",
+                    f"🔁 Retrying with attempt {attempt_number + 1}...",
+                )
+
+            payload = self._finalize_run(
                 run_record.id,
                 query,
-                plan,
-                traces,
-                final_answer,
+                attempts,
                 started_at,
             )
-            yield self._stream_event("final", payload.workflow_run.to_dict())
+            yield self._stream_event(
+                "status",
+                (
+                    "✅ Completed"
+                    if payload.workflow_run
+                    and payload.workflow_run.status == RUN_STATUS_COMPLETED
+                    else "❌ Failed"
+                ),
+            )
+            yield self._stream_event("final", payload.to_dict())
         except Exception as error:
             payload = self._finalize_failure(
                 run_record.id,
                 query,
-                plan,
-                traces,
                 error,
                 started_at,
-                final_answer=final_answer,
             )
             yield self._stream_event("status", "❌ Failed")
-            yield self._stream_event("final", payload.workflow_run.to_dict())
+            yield self._stream_event("final", payload.to_dict())

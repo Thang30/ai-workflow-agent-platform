@@ -7,15 +7,48 @@ import PlanView from '../components/PlanView';
 import TraceView from '../components/TraceView';
 import type {
   PlanStep,
+  WorkflowAttempt,
   WorkflowMessage,
   WorkflowRun,
+  WorkflowRunEnvelope,
   WorkflowStep,
+  WorkflowTrace,
 } from '../types/workflow';
+
+const buildWorkflowSteps = (traces: WorkflowTrace[]): WorkflowStep[] => {
+  return traces.map((trace) => ({
+    step: trace.step,
+    description: trace.description,
+    status: 'done',
+    output: trace.output,
+    tools: trace.tools,
+  }));
+};
+
+const getSelectedAttempt = (payload: WorkflowRunEnvelope | null) => {
+  if (!payload?.workflow_run) {
+    return null;
+  }
+
+  return (
+    payload.attempts.find(
+      (attempt) =>
+        attempt.attempt_number ===
+        payload.workflow_run?.selected_attempt_number,
+    ) ??
+    payload.attempts.at(-1) ??
+    null
+  );
+};
 
 export default function LiveWorkflowPage() {
   const [plan, setPlan] = useState<PlanStep[]>([]);
   const [steps, setSteps] = useState<WorkflowStep[]>([]);
   const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
+  const [attempts, setAttempts] = useState<WorkflowAttempt[]>([]);
+  const [currentAttemptNumber, setCurrentAttemptNumber] = useState<
+    number | null
+  >(null);
   const [status, setStatus] = useState('');
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -27,6 +60,8 @@ export default function LiveWorkflowPage() {
     setPlan([]);
     setSteps([]);
     setWorkflowRun(null);
+    setAttempts([]);
+    setCurrentAttemptNumber(null);
 
     const eventSource = streamWorkflow(query, {
       onMessage: (msg: WorkflowMessage) => {
@@ -35,11 +70,30 @@ export default function LiveWorkflowPage() {
             setStatus(msg.data);
             break;
 
+          case 'attempt_start':
+            setCurrentAttemptNumber(msg.data.attempt_number);
+            setPlan([]);
+            setSteps([]);
+            break;
+
+          case 'attempt_complete':
+            setAttempts((prev) => {
+              const next = prev.filter(
+                (attempt) => attempt.attempt_number !== msg.data.attempt_number,
+              );
+              return [...next, msg.data].sort(
+                (left, right) => left.attempt_number - right.attempt_number,
+              );
+            });
+            break;
+
           case 'plan':
-            setPlan(msg.data);
+            setCurrentAttemptNumber(msg.data.attempt_number);
+            setPlan(msg.data.plan);
             break;
 
           case 'step_start':
+            setCurrentAttemptNumber(msg.data.attempt_number);
             setSteps((prev) => {
               const existingStep = prev.find(
                 (step) => step.step === msg.data.step,
@@ -50,7 +104,8 @@ export default function LiveWorkflowPage() {
                   step.step === msg.data.step
                     ? {
                         ...step,
-                        ...msg.data,
+                        step: msg.data.step,
+                        description: msg.data.description,
                         status: 'running',
                         output: '',
                         tools: [],
@@ -61,12 +116,19 @@ export default function LiveWorkflowPage() {
 
               return [
                 ...prev,
-                { ...msg.data, status: 'running', output: '', tools: [] },
+                {
+                  step: msg.data.step,
+                  description: msg.data.description,
+                  status: 'running',
+                  output: '',
+                  tools: [],
+                },
               ];
             });
             break;
 
           case 'step_done':
+            setCurrentAttemptNumber(msg.data.attempt_number);
             setSteps((prev) => {
               const existingStep = prev.find(
                 (step) => step.step === msg.data.step,
@@ -100,8 +162,24 @@ export default function LiveWorkflowPage() {
 
           case 'final':
             completed = true;
-            setWorkflowRun(msg.data);
-            setStatus(msg.data.status === 'failed' ? 'Failed' : 'Completed');
+            setWorkflowRun(msg.data.workflow_run);
+            setAttempts(msg.data.attempts);
+
+            const selectedAttempt = getSelectedAttempt(msg.data);
+            setCurrentAttemptNumber(
+              msg.data.workflow_run?.selected_attempt_number ??
+                selectedAttempt?.attempt_number ??
+                null,
+            );
+            setPlan(selectedAttempt?.plan ?? msg.data.plan);
+            setSteps(
+              buildWorkflowSteps(selectedAttempt?.traces ?? msg.data.traces),
+            );
+            setStatus(
+              msg.data.workflow_run?.status === 'failed'
+                ? 'Failed'
+                : 'Completed',
+            );
             eventSourceRef.current?.close();
             eventSourceRef.current = null;
             break;
@@ -129,6 +207,18 @@ export default function LiveWorkflowPage() {
   }, []);
 
   const completedSteps = steps.filter((step) => step.status === 'done').length;
+  const selectedAttempt =
+    attempts.find(
+      (attempt) => attempt.attempt_number === currentAttemptNumber,
+    ) ??
+    (workflowRun?.selected_attempt_number
+      ? attempts.find(
+          (attempt) =>
+            attempt.attempt_number === workflowRun.selected_attempt_number,
+        )
+      : null) ??
+    attempts.at(-1) ??
+    null;
   const isRunning =
     Boolean(status) &&
     status !== 'Completed' &&
@@ -270,7 +360,12 @@ export default function LiveWorkflowPage() {
             </p>
           </div>
 
-          <FinalAnswer workflowRun={workflowRun} status={status} />
+          <FinalAnswer
+            workflowRun={workflowRun}
+            selectedAttempt={selectedAttempt}
+            attempts={attempts}
+            status={status}
+          />
         </section>
       </main>
     </>

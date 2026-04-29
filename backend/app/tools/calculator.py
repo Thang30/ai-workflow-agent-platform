@@ -8,7 +8,6 @@ from typing import Any, Callable
 
 from app.tools.common import build_tool_response, truncate_tool_text, utc_now_iso
 
-
 ALLOWED_FUNCTIONS: dict[str, Callable[..., Any]] = {
     "abs": abs,
     "ceil": math.ceil,
@@ -137,7 +136,9 @@ class CalculatorEvaluator:
 
         if isinstance(statement, ast.AugAssign):
             if not isinstance(statement.target, ast.Name):
-                raise ValueError("Calculator only supports variable augmented assignments")
+                raise ValueError(
+                    "Calculator only supports variable augmented assignments"
+                )
 
             variable_name = statement.target.id
             current_value = self._eval_node(statement.target)
@@ -201,7 +202,9 @@ class CalculatorEvaluator:
         if node.keywords:
             raise ValueError("Calculator range(...) does not support keyword arguments")
         if not 1 <= len(node.args) <= 3:
-            raise ValueError("Calculator range(...) supports 1 to 3 positional arguments")
+            raise ValueError(
+                "Calculator range(...) supports 1 to 3 positional arguments"
+            )
 
         values = [self._coerce_int(self._eval_node(argument)) for argument in node.args]
         result = range(*values)
@@ -297,7 +300,9 @@ class CalculatorEvaluator:
         raise ValueError("Unsupported calculator syntax")
 
 
-def calculate_expression(expression: str, structured: bool = False) -> str | dict[str, Any]:
+def calculate_expression(
+    expression: str, structured: bool = False
+) -> str | dict[str, Any]:
     normalized_expression = expression.strip()
     started_at = utc_now_iso()
     started_at_monotonic = perf_counter()

@@ -45,7 +45,9 @@ class SmallToolTests(unittest.TestCase):
 
         self.assertTrue(result["success"])
         self.assertIn("balance =", result["preview"])
-        self.assertAlmostEqual(result["raw_output"]["variables"]["balance"], 1349.017747382953)
+        self.assertAlmostEqual(
+            result["raw_output"]["variables"]["balance"], 1349.017747382953
+        )
 
     def test_calculator_normalizes_labeled_lines(self):
         result = calculate_expression(
@@ -60,7 +62,9 @@ class SmallToolTests(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertIn("year_1 =", result["preview"])
         self.assertIn("year_4 =", result["preview"])
-        self.assertAlmostEqual(result["raw_output"]["variables"]["year_4"], 1016.7711231216003)
+        self.assertAlmostEqual(
+            result["raw_output"]["variables"]["year_4"], 1016.7711231216003
+        )
 
     def test_current_datetime_returns_structured_result(self):
         result = current_datetime("Need today's date", structured=True)

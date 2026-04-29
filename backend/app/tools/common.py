@@ -2,12 +2,13 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-
 MAX_TOOL_INPUT_LENGTH = 4000
 TRUNCATION_SUFFIX = "\n...[truncated]"
 
 
-def normalize_tool_input(tool_input: Any, max_length: int = MAX_TOOL_INPUT_LENGTH) -> str:
+def normalize_tool_input(
+    tool_input: Any, max_length: int = MAX_TOOL_INPUT_LENGTH
+) -> str:
     if isinstance(tool_input, str):
         serialized_input = tool_input.strip()
     else:

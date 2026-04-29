@@ -7,7 +7,6 @@ from app.tools.calculator import calculate_expression
 from app.tools.current_datetime import current_datetime
 from app.tools.web_search import web_search
 
-
 ToolHandler = Callable[[Any, bool], str | dict[str, Any]]
 
 

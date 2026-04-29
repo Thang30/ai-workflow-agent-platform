@@ -185,7 +185,9 @@ class ExecutorAgent:
             }
 
         action = str(decision.get("action") or "respond").strip().lower()
-        decision_reason = str(decision.get("reason") or "No rationale provided.").strip()
+        decision_reason = str(
+            decision.get("reason") or "No rationale provided."
+        ).strip()
 
         if action != "use_tool":
             return {
@@ -200,7 +202,9 @@ class ExecutorAgent:
             }
 
         tool_name = str(decision.get("tool_name") or "").strip().lower()
-        tool_input = self._resolve_tool_input(decision.get("tool_input"), fallback_query)
+        tool_input = self._resolve_tool_input(
+            decision.get("tool_input"), fallback_query
+        )
         tool = self.tools.get(tool_name)
 
         if tool is None:

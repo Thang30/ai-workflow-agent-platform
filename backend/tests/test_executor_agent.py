@@ -1,7 +1,9 @@
 import os
 import unittest
 
-os.environ.setdefault("DATABASE_URL", "postgresql://localhost:5432/ai_workflow_agent_platform_test")
+os.environ.setdefault(
+    "DATABASE_URL", "postgresql://localhost:5432/ai_workflow_agent_platform_test"
+)
 os.environ.setdefault("HF_TOKEN", "test-token")
 os.environ.setdefault("MODEL", "test-model")
 
@@ -110,7 +112,9 @@ class ExecutorAgentTests(unittest.TestCase):
             ]
         )
 
-        result = agent.execute("Current step:\nWhat day is it today and what time is it?")
+        result = agent.execute(
+            "Current step:\nWhat day is it today and what time is it?"
+        )
 
         self.assertEqual(
             tool_calls,

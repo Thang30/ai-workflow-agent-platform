@@ -1,6 +1,4 @@
-import json
-import re
-
+from app.agents.json_parsing import find_first_json_value
 from app.agents.prompts import (
     DEFAULT_PLANNER_PROMPT,
     PLANNER_PROMPT_KEY,
@@ -19,34 +17,13 @@ class PlannerAgent:
         self.llm = LLMClient(model=model)
         self.prompt_overrides = prompt_overrides or {}
 
-    def _clean_json(self, text: str) -> str:
-        return text.strip().replace("```json", "").replace("```", "")
-
-    def _normalize_json(self, text: str) -> str:
-        return re.sub(r",(\s*[\]}])", r"\1", text)
-
     def _extract_steps(self, text: str):
-        cleaned_text = self._clean_json(text)
-        decoder = json.JSONDecoder()
-
-        for index, char in enumerate(cleaned_text):
-            if char not in "[{":
-                continue
-
-            candidate = cleaned_text[index:]
-
-            try:
-                parsed, _ = decoder.raw_decode(candidate)
-            except json.JSONDecodeError:
-                try:
-                    parsed, _ = decoder.raw_decode(self._normalize_json(candidate))
-                except json.JSONDecodeError:
-                    continue
-
-            if isinstance(parsed, list):
-                return parsed
-
-        raise ValueError("No valid JSON step list found in model response")
+        return find_first_json_value(
+            text,
+            start_chars="[{}",
+            accept=lambda value: isinstance(value, list),
+            normalize_trailing_commas=True,
+        )
 
     def _build_fallback_steps(self, query: str):
         return [{"step": 1, "description": query}]

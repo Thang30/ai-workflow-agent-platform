@@ -2,7 +2,7 @@
 
 AI Workflow Agent Platform is an inspectable multi-agent workflow system. It turns a user query into a plan, executes the steps with runtime tool selection, reviews the result into a final answer, evaluates quality, optionally retries, and persists the full run for history and analytics.
 
-The focus is operational visibility: plans, step traces, tool metadata, attempts, evaluator feedback, and experiment-aware analytics. For deeper design context, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/SPEC_1.md](docs/SPEC_1.md).
+The focus is operational visibility: plans, step traces, tool metadata, attempts, evaluator feedback, and experiment-aware analytics. For deeper design context, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Overview
 
